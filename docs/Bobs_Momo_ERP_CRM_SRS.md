@@ -38,34 +38,30 @@ Bob's Momo (Owner / Management) and Wide Angle Media and Technologies (Developme
 8. [Purchase & Vendor Management](#8-purchase--vendor-management)
 9. [Employee / Workforce Management](#9-employee--workforce-management)
 10. [Tasks, Checklists & Operational Audits](#10-tasks-checklists--operational-audits)
-11. [Game Engine & Reward Configuration](#11-game-engine--reward-configuration)
-12. [Customer Game CRM](#12-customer-game-crm)
-13. [Management & Analytics / Reporting](#13-management--analytics--reporting)
-14. [Notification Architecture](#14-notification-architecture)
-15. [Functional Requirements](#15-functional-requirements)
-16. [System Architecture](#16-system-architecture)
-17. [Database Overview](#17-database-overview)
-18. [Non-Functional Requirements](#18-non-functional-requirements)
-19. [Third-Party Integrations](#19-third-party-integrations)
-20. [Deployment & Infrastructure Cost](#20-deployment--infrastructure-cost)
-21. [Delivery Timeline (3 Weeks)](#21-delivery-timeline-3-weeks)
-22. [Testing & UAT](#22-testing--uat)
-23. [Assumptions & Constraints](#23-assumptions--constraints)
-24. [Future Scope (Post Phase 1)](#24-future-scope-post-phase-1)
-25. [Out of Scope](#25-out-of-scope)
-26. [Requirements Traceability Matrix](#26-requirements-traceability-matrix)
-27. [Acceptance Criteria](#27-acceptance-criteria)
-28. [Client & Agency Responsibilities](#28-client--agency-responsibilities)
-29. [Open Questions (TBC / Client Confirmation Required)](#29-open-questions-tbc--client-confirmation-required)
-30. [Sign-Off](#30-sign-off)
-
----
+11. [Management & Analytics / Reporting](#11-management--analytics--reporting)
+12. [Notification Architecture](#12-notification-architecture)
+13. [Functional Requirements](#13-functional-requirements)
+14. [System Architecture](#14-system-architecture)
+15. [Database Overview](#15-database-overview)
+16. [Non-Functional Requirements](#16-non-functional-requirements)
+17. [Third-Party Integrations](#17-third-party-integrations)
+18. [Deployment & Infrastructure Cost](#18-deployment--infrastructure-cost)
+19. [Delivery Timeline (3 Weeks)](#19-delivery-timeline-3-weeks)
+20. [Testing & UAT](#20-testing--uat)
+21. [Assumptions & Constraints](#21-assumptions--constraints)
+22. [Future Scope (Post Phase 1)](#22-future-scope-post-phase-1)
+23. [Out of Scope](#23-out-of-scope)
+24. [Requirements Traceability Matrix](#24-requirements-traceability-matrix)
+25. [Acceptance Criteria](#25-acceptance-criteria)
+26. [Client & Agency Responsibilities](#26-client--agency-responsibilities)
+27. [Open Questions (TBC / Client Confirmation Required)](#27-open-questions-tbc--client-confirmation-required)
+28. [Sign-Off](#28-sign-off)
 
 ## 1. Executive Summary
 
 Bob's Momo operates 2 outlets in Bhubaneswar serving momo, thukpa, Laphing, spring rolls and Pan-Asian food. Day-to-day operations — inventory, sales reporting, duty rosters, kitchen opening/closing, and stock updates — currently run on paper registers, Excel sheets and WhatsApp messages, with no centralized system of record.
 
-Wide Angle Media and Technologies will design and build a unified, web-based ERP & CRM covering Operations, Workforce, Customer Experience (Game CRM), Management Analytics and Internal Communication. The system is being delivered as a lean, automation-first Phase 1 MVP within a 3-week timeline, avoiding unnecessary approval layers so it fits the speed and simplicity a QSR business needs.
+Wide Angle Media and Technologies will design and build a unified, web-based ERP & CRM covering Operations, Workforce, Customer Experience (Customer Experience), Management Analytics and Internal Communication. The system is being delivered as a lean, automation-first Phase 1 MVP within a 3-week timeline, avoiding unnecessary approval layers so it fits the speed and simplicity a QSR business needs.
 
 Development cost: ₹45,000 (one-time). Target ongoing maintenance and infrastructure: under ₹5,000/month, based on the hosting stack detailed in Section 20.
 
@@ -101,7 +97,6 @@ The ERP & CRM will be organized into five business pillars, detailed in Section 
 
 - **Operations Management** — Inventory, Purchase, Vendors, Kitchen Operations, Tasks, SOPs, Checklists, Audits
 - **Workforce Management** — Employees, Attendance, Shifts, Breaks, Leave, Salary information, Performance, RBAC
-- **Customer Experience / Game CRM** — Customer database, game scores, coins, rewards, offers, coupons, QR redemption, leaderboards
 - **Management & Analytics** — Dashboards, Daily Sales, Inventory Consumption, Employee Performance, Reward Trends, P&L, Waste Analysis
 - **Internal Communication** — Chat, Alerts, Broadcasts, Task/Operational notifications, WhatsApp notifications where appropriate
 
@@ -166,9 +161,6 @@ Inventory, Purchase, Vendors, Kitchen Operations, Tasks, SOPs, Checklists, Audit
 
 ### 6.2 Workforce Management
 Employees, Attendance, Shifts, Breaks, Leave, Salary information, Performance visibility, RBAC. Covers employee profile (outlet, department, role), shift/attendance/break logging, leave request-approval-notify workflow, historical leave and salary information storage, and performance/activity visibility for managers.
-
-### 6.3 Customer Experience / Game CRM
-Customer database, game scores, coins, rewards, offers, coupons, QR-based redemption, leaderboards, activity history and basic fraud/abuse controls. Full workflow detailed in Sections 11 and 12.
 
 ### 6.4 Management & Analytics
 A management dashboard consolidating Daily Sales Summary, Inventory Consumption, Employee Performance, Customer Game/Reward Activity, P&L Overview (where data availability permits) and Waste Analysis. Detailed in Section 13.
@@ -254,42 +246,7 @@ The same task engine powers: Opening Checklist, Closing Checklist, Cleaning Chec
 
 ---
 
-## 11. Game Engine & Reward Configuration
-
-Designed as a content/reward management flow — not a multi-step CRM approval system.
-
-### 11.1 Admin Configuration Capabilities
-
-Game, Coin/reward value, Offer value, Reward type, Reward quantity/limits, Validity/expiry, Eligibility, Status (active/inactive/draft).
-
-### 11.2 Publishing Flow
-
-> **Admin Dashboard → Configure Game/Coins/Offer → Save Draft → Publish → Website receives updated configuration → Customer plays game → Score/coins recorded → Reward eligibility calculated → Reward issued → Customer notified → Redemption recorded**
-
-### 11.3 Architecture Principle
-
-The game/reward configuration is exposed to the website/game layer through secure APIs, keeping the ERP decoupled from any single specific game implementation — supporting the existing website games and future games without tight coupling.
-
----
-
-## 12. Customer Game CRM
-
-- Customer identity / contact where available
-- Games played, scores, coins
-- Rewards and offers earned
-- Redemption history
-- Activity timeline
-- Leaderboard data
-- Coupon / voucher information
-- QR-based reward redemption
-- Reward expiry tracking
-- Basic fraud/abuse controls (e.g., rate-limiting score submissions, duplicate-redemption prevention) where practical within timeline
-
-> **TBC:** Extent of fraud/abuse control sophistication achievable within the 3-week timeline; source and completeness of customer contact data capture (phone/email/guest).
-
----
-
-## 13. Management & Analytics / Reporting
+## 11. Management & Analytics / Reporting
 
 | Report | Depends On |
 |---|---|
@@ -304,7 +261,7 @@ The game/reward configuration is exposed to the website/game layer through secur
 
 ---
 
-## 14. Notification Architecture
+## 12. Notification Architecture
 
 Event-driven notifications only — no polling or manual status checks required. WhatsApp is used as a delivery channel where appropriate; the ERP database remains the system of record in all cases.
 
@@ -322,11 +279,11 @@ Event-driven notifications only — no polling or manual status checks required.
 
 ---
 
-## 15. Functional Requirements
+## 13. Functional Requirements
 
 Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 committed), **Should-Have** (Phase 1 if timeline permits), **Could-Have** (candidate for Future Scope).
 
-### 15.1 Authentication & Access
+### 13.1 Authentication & Access
 
 #### FR-AUTH-001 — Custom User Login
 | Field | Detail |
@@ -361,7 +318,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 | Exceptions / Business Rules | Expired/revoked tokens rejected |
 | Priority | Must-Have |
 
-### 15.2 Inventory
+### 13.2 Inventory
 
 #### FR-INV-001 — Record Stock Transaction
 | Field | Detail |
@@ -396,7 +353,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 | Exceptions / Business Rules | Empty state shown if no data in range |
 | Priority | Should-Have |
 
-### 15.3 Purchase & Vendor
+### 13.3 Purchase & Vendor
 
 #### FR-PUR-001 — Create Purchase Request
 | Field | Detail |
@@ -431,7 +388,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 | Exceptions / Business Rules | N/A |
 | Priority | Should-Have |
 
-### 15.4 Employee & Workforce
+### 13.4 Employee & Workforce
 
 #### FR-EMP-001 — Employee Profile Management
 | Field | Detail |
@@ -477,7 +434,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 | Exceptions / Business Rules | Access restricted to HR/Accounts and Owner |
 | Priority | Must-Have |
 
-### 15.5 Tasks & Operations
+### 13.5 Tasks & Operations
 
 #### FR-TASK-001 — Create & Assign Task
 | Field | Detail |
@@ -523,55 +480,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 | Exceptions / Business Rules | Failed audit items can trigger a follow-up task |
 | Priority | Must-Have |
 
-### 15.6 Game / Reward Configuration
-
-#### FR-GAME-001 — Configure & Publish Game/Reward
-| Field | Detail |
-|---|---|
-| Description | Admin configures game, coin/reward value, offer, eligibility, validity and publishes live to the website. |
-| Actor(s) | Owner, Operations Manager |
-| Preconditions | N/A |
-| Main Flow | 1) Admin configures parameters 2) Saves draft 3) Publishes 4) Website consumes updated config via API |
-| Expected Result | Live configuration reflected on website without code deployment |
-| Exceptions / Business Rules | Draft changes do not affect live config until published |
-| Priority | Must-Have |
-
-#### FR-GAME-002 — Record Score & Calculate Reward
-| Field | Detail |
-|---|---|
-| Description | Record customer game score/coins and calculate reward eligibility per published configuration. |
-| Actor(s) | System (automated), Customer (via website) |
-| Preconditions | Game configuration published |
-| Main Flow | 1) Customer plays game 2) Website submits score via API 3) System calculates eligibility 4) Reward issued if eligible |
-| Expected Result | Reward issued and customer notified |
-| Exceptions / Business Rules | Duplicate/abnormal submissions flagged per basic fraud controls |
-| Priority | Must-Have |
-
-### 15.7 Customer CRM
-
-#### FR-CRM-001 — Customer Profile & Activity
-| Field | Detail |
-|---|---|
-| Description | Maintain customer profile with identity/contact, activity timeline, and redemption history. |
-| Actor(s) | System (automated), Owner, Operations Manager |
-| Preconditions | Customer engages via website game |
-| Main Flow | 1) Customer identified (contact/guest) 2) Activity recorded 3) Profile updated |
-| Expected Result | Consolidated customer activity view for management |
-| Exceptions / Business Rules | Guest vs identified customer handling TBC |
-| Priority | Must-Have |
-
-#### FR-CRM-002 — QR Reward Redemption
-| Field | Detail |
-|---|---|
-| Description | Redeem an issued reward via QR code at the outlet. |
-| Actor(s) | Counter/Cashier, Customer |
-| Preconditions | Reward issued and unexpired |
-| Main Flow | 1) Customer presents QR 2) Staff scans/enters code 3) System validates and marks redeemed |
-| Expected Result | Redemption recorded; reward cannot be redeemed twice |
-| Exceptions / Business Rules | Expired/already-redeemed codes rejected with clear message |
-| Priority | Must-Have |
-
-### 15.8 Notifications & Communication
+### 13.6 Notifications & Communication
 
 #### FR-NOTIF-001 — Event-Driven Notification Dispatch
 | Field | Detail |
@@ -597,7 +506,7 @@ Each requirement is uniquely identified. Priority: **Must-Have** (Phase 1 commit
 
 ---
 
-## 16. System Architecture
+## 14. System Architecture
 
 ### 16.1 High-Level Architecture
 Next.js frontend (web application, admin dashboard, and website game integration layer) communicates over secure REST APIs with a NestJS backend running on the Bun runtime. The backend uses Prisma as the ORM against a PostgreSQL database hosted on Supabase. Upstash Redis provides caching and background job/queue support. The backend is deployed on Railway; the frontend is deployed via Next.js production hosting. WhatsApp Business API integration handles outbound notifications where applicable.
@@ -623,9 +532,6 @@ Event-driven dispatcher triggered by domain events (see Section 14), delivering 
 ### 16.8 Redis Usage
 Upstash Redis is used for caching frequently read data (e.g., published game configuration, dashboard summaries) and lightweight background job/queue processing (e.g., notification dispatch), reducing database load.
 
-### 16.9 Game Integration Architecture
-Game/reward configuration is published from the Admin Dashboard and cached for fast retrieval by the website layer. Score/coin submissions and redemption requests flow back into the ERP through dedicated, secured API endpoints, decoupling the ERP from any single game implementation.
-
 ### 16.10 Deployment Architecture
 
 | Component | Platform |
@@ -643,7 +549,7 @@ Separate staging and production environments where feasible within budget; envir
 
 ---
 
-## 17. Database Overview
+## 15. Database Overview
 
 Major entities and relationships (Prisma schema, PostgreSQL). Only business-justified relationships are modeled — no speculative normalization.
 
@@ -664,15 +570,6 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 | Vendor | Supplier master data |
 | Purchase | Purchase record; linked to Vendor |
 | PurchaseItem | Line item within a Purchase; linked to InventoryItem, quantity, unit price |
-| Customer | Customer identity/contact; linked to game activity |
-| Game | Game definition consumed by website layer |
-| GameConfiguration | Versioned config (coins/offer/eligibility/validity); draft/published state |
-| GameScore | Score submissions per Customer per Game |
-| CoinTransaction | Coin earn/spend ledger per Customer |
-| Reward | Reward definition and issuance record |
-| Offer | Promotional offer definition |
-| Coupon | Issued voucher/coupon linked to a Reward or Offer |
-| Redemption | Redemption event linked to Coupon/Reward and Customer |
 | Notification | Dispatched notification record (event, recipient, channel, status) |
 | Broadcast | Outlet/department-wide message |
 | AuditLog | System-wide action log for accountability |
@@ -681,7 +578,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 18. Non-Functional Requirements
+## 16. Non-Functional Requirements
 
 | Category | Requirement |
 |---|---|
@@ -701,7 +598,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 19. Third-Party Integrations
+## 17. Third-Party Integrations
 
 | Integration | Status | Notes |
 |---|---|---|
@@ -712,7 +609,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 20. Deployment & Infrastructure Cost
+## 18. Deployment & Infrastructure Cost
 
 **Development Cost:** ₹45,000 (one-time). **Target Maintenance & Infrastructure:** under ₹5,000/month.
 
@@ -727,7 +624,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 21. Delivery Timeline (3 Weeks)
+## 19. Delivery Timeline (3 Weeks)
 
 | Week | Focus |
 |---|---|
@@ -739,7 +636,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 22. Testing & UAT
+## 20. Testing & UAT
 
 - Unit/integration testing of core backend modules (Inventory, Purchase, Employee, Task, Game, Notification)
 - Functional testing of each FR against its Main Flow and Expected Result
@@ -749,7 +646,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 23. Assumptions & Constraints
+## 21. Assumptions & Constraints
 
 ### 23.1 Assumptions
 - Client will provide timely feedback and content (item lists, vendor lists, employee lists, game rules) during Week 1
@@ -765,18 +662,18 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 24. Future Scope (Post Phase 1)
+## 22. Future Scope (Post Phase 1)
 
 - Hardware integrations: thermal printers, barcode scanners, Kitchen Display System (KDS), customer displays, biometric attendance devices, cash drawers
 - POS integration for automated sales data capture (if no existing POS API is confirmed for Phase 1)
 - Payroll computation and payslip generation (if salary information storage only is chosen for Phase 1)
-- Advanced fraud/abuse detection for the Game CRM
+- Advanced fraud/abuse detection for the Customer Experience
 - Multi-outlet expansion beyond the initial 2 outlets
 - Advanced analytics / BI layer beyond the Phase 1 dashboard
 
 ---
 
-## 25. Out of Scope
+## 23. Out of Scope
 
 - Any hardware procurement or hardware integration under this SRS
 - Google OAuth or any social login
@@ -786,7 +683,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 26. Requirements Traceability Matrix
+## 24. Requirements Traceability Matrix
 
 | Client Requirement | Module | Functional Requirement(s) |
 |---|---|---|
@@ -801,13 +698,11 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 | Historical leave & salary management | Workforce | FR-EMP-004 |
 | Task assignment & operational audits | Tasks & Operations | FR-TASK-001–FR-TASK-004 |
 | Internal Chat, Alerts, Broadcast | Communication | FR-NOTIF-001, FR-NOTIF-002 |
-| Customer games, scores, coins, rewards | Game CRM | FR-GAME-001, FR-GAME-002, FR-CRM-001, FR-CRM-002 |
-| Dashboard for customer game/reward activity | Analytics | Section 13 |
 | Business reporting (sales, inventory, performance, rewards, P&L, waste) | Analytics | Section 13 |
 
 ---
 
-## 27. Acceptance Criteria
+## 25. Acceptance Criteria
 
 1. All Must-Have functional requirements in Section 15 are implemented and pass functional testing
 2. RBAC correctly restricts each defined role to its intended modules/outlets
@@ -818,11 +713,10 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 28. Client & Agency Responsibilities
+## 26. Client & Agency Responsibilities
 
 ### 28.1 Bob's Momo (Client) Responsibilities
 - Provide item, vendor, employee and outlet master data within Week 1
-- Provide existing game rules/assets for the website game layer
 - Confirm all TBC items listed in Section 29 promptly to avoid timeline slippage
 - Participate in Week 3 UAT and provide sign-off
 - Bear ongoing third-party usage costs (e.g., WhatsApp Business API usage) beyond fixed infrastructure
@@ -835,7 +729,7 @@ Major entities and relationships (Prisma schema, PostgreSQL). Only business-just
 
 ---
 
-## 29. Open Questions (TBC / Client Confirmation Required)
+## 27. Open Questions (TBC / Client Confirmation Required)
 
 Consolidated from all sections above. These must be resolved during Week 1 to avoid timeline impact.
 
@@ -851,7 +745,7 @@ Consolidated from all sections above. These must be resolved during Week 1 to av
 
 ---
 
-## 30. Sign-Off
+## 28. Sign-Off
 
 By signing below, both parties confirm agreement with the scope, requirements and terms defined in this Software Requirements Specification, including the Phase 1 scope boundaries, 3-week timeline, and the Scope Management statement in Section 3.1.
 

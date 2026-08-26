@@ -1,0 +1,27 @@
+import js from '@eslint/js';
+import ts from 'typescript-eslint';
+
+export default ts.config(
+  { ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', 'book/**', '**/*.js'] },
+  js.configs.recommended,
+  ...ts.configs.recommended,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: {
+          // Config files and the bun test file sit outside every tsconfig project.
+          allowDefaultProject: ['*.mjs', 'apps/web/*.mjs', 'packages/shared/src/*.test.ts'],
+        },
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      // Prisma Decimal and Nest DI make these two noisy without catching bugs.
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+    },
+  },
+);

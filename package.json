@@ -1,0 +1,26 @@
+{
+  "name": "bobs-momo",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run shared:build && bun run --filter '@bobs-momo/api' --filter '@bobs-momo/web' dev",
+    "build": "bun run shared:build && bun run --filter '@bobs-momo/api' --filter '@bobs-momo/web' build",
+    "shared:build": "bun run --cwd packages/shared build",
+    "lint": "eslint .",
+    "typecheck": "bun run shared:build && bun run --filter '*' typecheck",
+    "db:migrate": "bun run --cwd apps/api db:migrate",
+    "db:seed": "bun run --cwd apps/api db:seed",
+    "db:reset": "bun run --cwd apps/api db:reset",
+    "db:studio": "bun run --cwd apps/api db:studio"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.21.0",
+    "eslint": "^9.21.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.25.0"
+  },
+  "packageManager": "bun@1.3.14"
+}

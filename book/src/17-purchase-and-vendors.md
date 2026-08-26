@@ -106,7 +106,7 @@ Every allowed transition, and nothing else is allowed:
 |---|---|---|---|---|
 | (none) | `PENDING` | `POST /purchase-requests` | `purchase.request.create` | `PURCHASE_REQUESTED` |
 | `PENDING` | `APPROVED` | `POST /purchase-requests/:id/approve` | `purchase.request.approve` | `PURCHASE_DECIDED` |
-| `PENDING` | `REJECTED` | `POST /purchase-requests/:id/reject` | `purchase.request.reject` | `PURCHASE_DECIDED` |
+| `PENDING` | `REJECTED` | `POST /purchase-requests/:id/reject` | `purchase.request.approve` | `PURCHASE_DECIDED` |
 | `PENDING` | `CANCELLED` | `POST /purchase-requests/:id/cancel` | `purchase.request.cancel` | none |
 | `APPROVED` | `FULFILLED` | `POST /purchases` with `requestId` | `purchase.record.create` | `PURCHASE_RECORDED` |
 
@@ -332,16 +332,19 @@ A `null` renders as "no comparison" in the UI, never as 0 percent. An item first
 purchased last week has no prior period, and showing "0% change" for it is a
 lie that a manager will act on.
 
-> **Spec note:** this chapter introduces the permission keys
-> `purchase.vendor.create`, `purchase.vendor.read`, `purchase.vendor.update`,
-> `purchase.vendor.deactivate`, `purchase.vendor.link`,
+> **Spec note:** this module uses twelve keys, all of them defined in the
+> chapter 14 matrix: `vendor.vendor.create`, `vendor.vendor.read`,
+> `vendor.vendor.update`, `vendor.vendor.deactivate`,
 > `purchase.request.create`, `purchase.request.read`,
-> `purchase.request.approve`, `purchase.request.reject`,
-> `purchase.request.cancel`, `purchase.record.create`, `purchase.record.read`,
-> `purchase.record.void`, `purchase.price.read` and `purchase.report.read`.
-> Vendor keys sit under the `purchase` module prefix even though vendors are a
-> separate NestJS module, because the roles that manage vendors are the roles
-> that record purchases. Chapter 14 owns the role mapping.
+> `purchase.request.approve`, `purchase.request.cancel`,
+> `purchase.record.create`, `purchase.record.read`, `purchase.record.void`
+> and `purchase.price_history.read`.
+>
+> Approve and reject share `purchase.request.approve`: they are the same
+> decision authority, and a separate reject key would let somebody refuse a
+> request they cannot grant. Editing a vendor's item links is
+> `vendor.vendor.update`, since it is an edit to the vendor record. Chapter 14
+> owns the role mapping.
 
 ## Endpoint reference
 
@@ -353,7 +356,7 @@ defined in that chapter.
 
 ### GET /vendors
 
-Permission `purchase.vendor.read`. Scope `NONE`.
+Permission `vendor.vendor.read`. Scope `NONE`.
 
 ```ts
 export const listVendorsQuery = pageQuery.extend({
@@ -375,7 +378,7 @@ export const listVendorsQuery = pageQuery.extend({
 
 ### POST /vendors
 
-Permission `purchase.vendor.create`. Scope `NONE`. Status 201.
+Permission `vendor.vendor.create`. Scope `NONE`. Status 201.
 
 ```ts
 export const createVendorSchema = z.object({
@@ -402,19 +405,20 @@ existingId: "v1a2..." }]` so the UI can link to the existing vendor.
 
 ### PATCH /vendors/:id
 
-Permission `purchase.vendor.update`. Scope `NONE`. Same fields as create, all
+Permission `vendor.vendor.update`. Scope `NONE`. Same fields as create, all
 optional, plus `isActive`. 404 `VENDOR_NOT_FOUND`, 409 `VENDOR_NAME_TAKEN`.
 
 ### POST /vendors/:id/deactivate
 
-Permission `purchase.vendor.deactivate`. Scope `NONE`. Empty body, 200 with the
+Permission `vendor.vendor.deactivate`. Scope `NONE`. Empty body, 200 with the
 updated vendor. Idempotent. The response includes `openRequests`, the count of
 `PENDING` or `APPROVED` purchase requests that named this vendor, so the UI can
 warn before retiring an active supplier.
 
 ### GET /vendors/:id/items and PUT /vendors/:id/items
 
-Permissions `purchase.vendor.read` and `purchase.vendor.link`. Scope `NONE`.
+Permissions `vendor.vendor.read` to read and `vendor.vendor.update` to write.
+Scope `NONE`.
 
 `PUT` replaces the whole link set in one call rather than exposing add and
 remove endpoints. The UI is a multi-select and a save button, so a whole-set
@@ -520,8 +524,9 @@ the request with its lines, the decision fields (`decidedById`, `decidedAt`,
 
 ### POST /purchase-requests/:id/approve, /reject, /cancel
 
-Permissions `purchase.request.approve`, `purchase.request.reject`,
-`purchase.request.cancel`. Scope `OWN_OUTLET` or `ALL_OUTLETS`. Status 200.
+Permissions `purchase.request.approve` for both approve and reject, and
+`purchase.request.cancel` for cancel. Approving and rejecting are the same
+decision authority, so they share one key. Scope `OWN_OUTLET` or `ALL_OUTLETS`. Status 200.
 
 ```ts
 export const decideRequestSchema = z.object({
@@ -710,7 +715,7 @@ that explains it.
 
 ### GET /purchases/price-history
 
-Permission `purchase.price.read`. Scope `NONE`. The raw observation list.
+Permission `purchase.price_history.read`. Scope `NONE`. The raw observation list.
 
 ```ts
 export const priceHistoryQuery = pageQuery.extend({
@@ -741,7 +746,7 @@ removed.
 
 ### GET /items/:id/price-trend
 
-Permission `purchase.price.read`. Scope `NONE`. The chart endpoint.
+Permission `purchase.price_history.read`. Scope `NONE`. The chart endpoint.
 
 ```ts
 export const priceTrendQuery = z.object({
@@ -777,7 +782,7 @@ recording flow.
 
 ### GET /purchases/summary
 
-Permission `purchase.report.read`. Scope `OWN_OUTLET` or `ALL_OUTLETS`.
+Permission `purchase.record.read`. Scope `OWN_OUTLET` or `ALL_OUTLETS`.
 
 ```ts
 export const purchaseSummaryQuery = z.object({

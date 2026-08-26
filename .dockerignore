@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+book/book
+.git
+.github
+*.md
+!README.md
+.env
+.env.*
+!.env.example
+coverage

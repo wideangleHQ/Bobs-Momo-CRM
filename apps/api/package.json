@@ -20,18 +20,19 @@
     "seed": "bun run prisma/seed.ts"
   },
   "dependencies": {
+    "@bobs-momo/shared": "workspace:*",
     "@nestjs/common": "^11.0.11",
     "@nestjs/core": "^11.0.11",
     "@nestjs/platform-express": "^11.0.11",
     "@nestjs/schedule": "^5.0.1",
     "@prisma/client": "^6.4.1",
     "argon2": "^0.41.1",
+    "cron-parser": "^5.10.0",
     "ioredis": "^5.5.0",
     "jose": "^5.9.6",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "zod": "^3.24.2",
-    "@bobs-momo/shared": "workspace:*"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.5",

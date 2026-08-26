@@ -28,7 +28,7 @@ Requirements implemented: FR-TASK-001 (create and assign), FR-TASK-002
 audit execution).
 
 > **Spec note:** this chapter introduces the permission keys
-> `task.task.create`, `task.task.read`, `task.task.update`,
+> `task.task.create`, `task.task.read`, `task.task.update_self`,
 > `task.task.complete`, `task.task.cancel`, `task.template.manage` and
 > `task.recurrence.manage` (`task.task.verify` is already in chapter 14); the
 > error codes `TASK_INVALID_TRANSITION`, `CHECKLIST_INCOMPLETE`,
@@ -103,14 +103,14 @@ audit that nobody senior ever looks at is a form-filling exercise.
 | From | To | Trigger | Permission | Actor | Event |
 |---|---|---|---|---|---|
 | (none) | OPEN | `POST /tasks` | `task.task.create` | Manager, or the system | `TASK_ASSIGNED` when an assignee is set |
-| OPEN | IN_PROGRESS | `POST /tasks/:id/start` | `task.task.update` | Assignee, or a manager | none |
+| OPEN | IN_PROGRESS | `POST /tasks/:id/start` | `task.task.update_self` | Assignee, or a manager | none |
 | OPEN | COMPLETED | `POST /tasks/:id/complete` | `task.task.complete` | Assignee, or a manager | none |
 | OPEN | CANCELLED | `POST /tasks/:id/cancel` | `task.task.cancel` | Creator or a manager | none |
 | OPEN | OVERDUE | overdue sweep | system | job | `TASK_OVERDUE` |
 | IN_PROGRESS | COMPLETED | `POST /tasks/:id/complete` or `/checklist` | `task.task.complete` | Assignee | none |
 | IN_PROGRESS | CANCELLED | `POST /tasks/:id/cancel` | `task.task.cancel` | Creator or a manager | none |
 | IN_PROGRESS | OVERDUE | overdue sweep | system | job | `TASK_OVERDUE` |
-| OVERDUE | IN_PROGRESS | `POST /tasks/:id/start` | `task.task.update` | Assignee | none |
+| OVERDUE | IN_PROGRESS | `POST /tasks/:id/start` | `task.task.update_self` | Assignee | none |
 | OVERDUE | COMPLETED | `POST /tasks/:id/complete` or `/checklist` | `task.task.complete` | Assignee | none |
 | OVERDUE | CANCELLED | `POST /tasks/:id/cancel` | `task.task.cancel` | Manager | none |
 | COMPLETED | VERIFIED | `POST /tasks/:id/verify` | `task.task.verify` | Manager | none |
@@ -639,7 +639,7 @@ round trip on a phone. 404 `NOT_FOUND` outside scope.
 
 ### PATCH /tasks/:id
 
-Permission `task.task.update`, scope OWN_OUTLET, 200.
+Permission `task.task.update_self`, scope OWN_OUTLET, 200.
 
 ```ts
 export const updateTaskBody = createTaskBody
@@ -655,7 +655,7 @@ with 409 `TASK_INVALID_TRANSITION`.
 
 ### POST /tasks/:id/start
 
-Permission `task.task.update`, scope SELF for the assignee or OWN_OUTLET for a
+Permission `task.task.update_self`, scope SELF for the assignee or OWN_OUTLET for a
 manager, 200. Empty body. Sets `IN_PROGRESS` and stamps `startedAt` if not
 already set. Valid from `OPEN` and `OVERDUE`. Anything else is
 409 `TASK_INVALID_TRANSITION`.
@@ -735,7 +735,7 @@ served by `@@index([taskId, createdAt])`.
 
 | | |
 |---|---|
-| Permission | `task.task.update` |
+| Permission | `task.task.update_self` |
 | Scope | SELF for the assignee, OWN_OUTLET for a manager |
 | Success | 201 |
 

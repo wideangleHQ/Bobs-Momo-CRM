@@ -73,4 +73,44 @@ export class AdminAuditService {
       query,
     );
   }
+
+  /**
+   * A DEAD outbox row is a notification that was owed to somebody and never
+   * arrived: a low stock alert, a leave decision, an overdue task. The
+   * dispatcher retries and then gives up, and without this screen nothing in
+   * the product ever says so. Read only, same as the audit log: replaying a
+   * dead row is a deploy-time decision, not a button.
+   */
+  async deadLetters(query: { page: number; pageSize: number }) {
+    const where = { status: 'DEAD' as const };
+    const [rows, total, pending] = await this.prisma.$transaction([
+      this.prisma.outboxEvent.findMany({
+        where,
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.outboxEvent.count({ where }),
+      this.prisma.outboxEvent.count({ where: { status: 'PENDING' } }),
+    ]);
+
+    return {
+      ...paginate(
+        rows.map((r) => ({
+          id: r.id,
+          eventKey: r.eventKey,
+          aggregateType: r.aggregateType,
+          aggregateId: r.aggregateId,
+          attempts: r.attempts,
+          lastError: r.lastError,
+          createdAt: r.createdAt.toISOString(),
+        })),
+        total,
+        query,
+      ),
+      // A backlog that is growing means the dispatcher is behind or stopped,
+      // which is a different problem from a row that failed on its own merits.
+      pendingCount: pending,
+    };
+  }
 }

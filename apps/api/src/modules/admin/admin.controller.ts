@@ -47,6 +47,7 @@ import {
 } from '@bobs-momo/shared';
 import { Scope } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { pageQuerySchema, type PageQuery } from '@bobs-momo/shared';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import type { AuthedRequest, RequestScope } from '../../common/types/request';
 import { actorOf } from './audit-writer';
@@ -269,5 +270,13 @@ export class AdminController {
     @Scope() scope: RequestScope,
   ) {
     return this.audit.list(query, scope);
+  }
+
+  // Behind the audit key rather than a new one: it is the same question, which
+  // is "what did the system do, and what did it fail to do".
+  @Get('outbox/dead')
+  @Permissions('admin.audit.read')
+  listDeadLetters(@Query(new ZodValidationPipe(pageQuerySchema)) query: PageQuery) {
+    return this.audit.deadLetters(query);
   }
 }

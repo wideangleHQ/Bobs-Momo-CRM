@@ -453,3 +453,25 @@ describe('audit log', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// A DEAD outbox row is a notification somebody was owed and never got. Without
+// a screen for it, the product never says so.
+describe('dead letters', () => {
+  test('lists dead rows and the pending backlog, and has no replay endpoint', async () => {
+    const res = await api('GET', '/admin/outbox/dead');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body?.['data'])).toBe(true);
+    expect(typeof res.body?.['pendingCount']).toBe('number');
+
+    // Replaying a dead row is a deploy-time decision, not a button.
+    for (const method of ['POST', 'PATCH', 'DELETE']) {
+      const attempt = await api(method, '/admin/outbox/dead');
+      expect(attempt.status).toBe(404);
+    }
+  });
+
+  test('a role without the audit key cannot read it', async () => {
+    const res = await api('GET', '/admin/outbox/dead', undefined, mgrToken);
+    expect(res.status).toBe(403);
+  });
+});

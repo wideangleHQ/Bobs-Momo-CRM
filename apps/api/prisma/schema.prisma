@@ -890,6 +890,19 @@ model RewardIssue {
 
 // ── audit ────────────────────────────────────────────────────────────────
 
+// Allocates PO-2026-0117 and PR-2026-0042. One row per kind per year, bumped
+// with UPDATE ... RETURNING inside the caller's transaction, so two purchases
+// recorded in the same second cannot take the same number. A rolled back
+// purchase burns a number; a gap is harmless, a duplicate is not.
+model DocumentCounter {
+  kind      String
+  year      Int
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([kind, year])
+}
+
 model AuditLog {
   id         String   @id @default(uuid()) @db.Uuid
   actorId    String?  @db.Uuid

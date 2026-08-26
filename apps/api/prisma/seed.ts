@@ -19,7 +19,12 @@ async function main(): Promise<void> {
   const logins = tier === 'demo' ? await seedDemo(prisma) : [];
 
   console.log(`seed ok (tier=${tier})`);
-  if (owner) console.log(`  owner login: ${owner} / ${process.env.SEED_OWNER_PASSWORD ?? 'ChangeMe123!'}`);
+  if (owner) {
+    // Never echo a password that came from the environment: deployment logs are
+    // retained, searchable and read by more people than the person seeding.
+    const hint = process.env.SEED_OWNER_PASSWORD ? '<SEED_OWNER_PASSWORD>' : 'ChangeMe123!';
+    console.log(`  owner login: ${owner} / ${hint}`);
+  }
   if (logins.length > 0) {
     console.log(`  demo logins (password ChangeMe123!, all mustReset): ${logins.join(', ')}`);
   }

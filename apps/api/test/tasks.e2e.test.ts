@@ -848,3 +848,49 @@ describe('outlet scope and self scope', () => {
     expect(res.body?.['authorId']).toBe(cookEmployeeId);
   });
 });
+
+// The compliance report is the number the owner opens to answer "is the Patia
+// kitchen actually running the opening checklist".
+describe('compliance', () => {
+  test('a range with no checklists reports null rates, not zero', async () => {
+    const res = await api('GET', '/tasks/compliance?from=2020-01-01&to=2020-01-02');
+    expect(res.status).toBe(200);
+    const rows = res.body?.['data'] as Array<{ completionRate: number | null }>;
+    // Zero would read as total failure. Nothing happened, so there is no rate.
+    expect(rows.every((r) => r.completionRate === null)).toBe(true);
+  });
+
+  test('a cancelled run does not count against the completion rate', async () => {
+    const today = toBusinessDate();
+    const res = await api('GET', `/tasks/compliance?from=${today}&to=${today}`);
+    expect(res.status).toBe(200);
+    const rows = res.body?.['data'] as Array<{
+      generated: number;
+      completed: number;
+      cancelled: number;
+      completionRate: number | null;
+    }>;
+    for (const r of rows) {
+      const expected = r.generated - r.cancelled;
+      if (expected === 0) {
+        expect(r.completionRate).toBeNull();
+      } else {
+        expect(r.completionRate).toBeCloseTo(r.completed / expected, 3);
+      }
+    }
+  });
+
+  test('an out of scope outlet is 404', async () => {
+    const today = toBusinessDate();
+    const res = await api(
+      'GET',
+      `/tasks/compliance?from=${today}&to=${today}&outletId=00000000-0000-4000-8000-000000000000`,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  test('an inverted date range is refused', async () => {
+    const res = await api('GET', '/tasks/compliance?from=2026-08-26&to=2026-08-01');
+    expect(res.status).toBe(400);
+  });
+});

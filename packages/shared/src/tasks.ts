@@ -119,6 +119,21 @@ export const listTasksQuery = pageQuerySchema.extend({
 });
 export type ListTasksQuery = z.infer<typeof listTasksQuery>;
 
+export const complianceQuery = z
+  .object({
+    outletId: uuidSchema.optional(),
+    from: businessDateSchema,
+    to: businessDateSchema,
+    // Compliance is about the work the system generated, not the ad hoc work a
+    // manager typed in, so one-off tasks are excluded by default.
+    kind: z
+      .union([z.enum(TASK_KINDS), z.array(z.enum(TASK_KINDS))])
+      .default(['CHECKLIST_RUN', 'AUDIT_RUN'])
+      .transform((v) => (Array.isArray(v) ? v : [v])),
+  })
+  .refine((o) => o.from <= o.to, { path: ['to'], message: 'to must not be before from' });
+export type ComplianceQuery = z.infer<typeof complianceQuery>;
+
 export const myTasksQuery = z.object({
   includeCompleted: z
     .enum(['true', 'false'])

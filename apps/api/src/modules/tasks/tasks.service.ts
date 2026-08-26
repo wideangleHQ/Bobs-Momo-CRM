@@ -16,6 +16,7 @@ import {
   type CreateCommentDto,
   type CreateTaskDto,
   type ListTasksQuery,
+  type ComplianceQuery,
   type MyTasksQuery,
   type SubmitChecklistDto,
   type UpdateTaskDto,
@@ -197,6 +198,141 @@ export class TasksService {
       }
     }
     return groups;
+  }
+
+  /**
+   * Answers "is the Patia kitchen actually running the opening checklist",
+   * which is one of the original reasons for the project.
+   *
+   * completionRate divides by generated minus cancelled, not by generated. A
+   * checklist cancelled because the outlet was shut is not a checklist that was
+   * skipped, and counting it as one would make a closed Sunday look like
+   * negligence.
+   */
+  async compliance(query: ComplianceQuery, scope: RequestScope) {
+    const outletIds = query.outletId
+      ? scope.outletIds.filter((id) => id === query.outletId)
+      : scope.outletIds;
+    if (query.outletId && outletIds.length === 0) throw DomainError.notFound();
+
+    const from = new Date(`${query.from}T00:00:00.000Z`);
+    const to = new Date(`${query.to}T00:00:00.000Z`);
+
+    const tasks = await this.prisma.task.findMany({
+      where: {
+        outletId: { in: outletIds },
+        kind: { in: query.kind },
+        businessDate: { gte: from, lte: to },
+      },
+      select: {
+        id: true,
+        outletId: true,
+        status: true,
+        dueAt: true,
+        completedAt: true,
+        parentTaskId: true,
+        outlet: { select: { code: true } },
+        template: { select: { code: true, name: true } },
+      },
+    });
+
+    const taskIds = tasks.map((t) => t.id);
+    const [failedItems, followUps] = await Promise.all([
+      this.prisma.taskChecklistResult.count({
+        where: { taskId: { in: taskIds }, result: 'FAIL' },
+      }),
+      this.prisma.task.findMany({
+        where: { parentTaskId: { in: taskIds } },
+        select: { outletId: true, status: true },
+      }),
+    ]);
+
+    const buckets = new Map<string, ComplianceBucket>();
+    for (const outletId of outletIds) {
+      buckets.set(outletId, emptyBucket(outletId, ''));
+    }
+
+    for (const t of tasks) {
+      const bucket = buckets.get(t.outletId) ?? emptyBucket(t.outletId, t.outlet.code);
+      bucket.outletCode = t.outlet.code;
+      bucket.generated += 1;
+      if (t.status === 'CANCELLED') bucket.cancelled += 1;
+      const done = t.status === 'COMPLETED' || t.status === 'VERIFIED';
+      if (done) {
+        bucket.completed += 1;
+        // Late is completedAt against dueAt, the two columns that already
+        // exist. A task with no due time cannot be late.
+        if (!t.dueAt || (t.completedAt && t.completedAt <= t.dueAt)) bucket.onTime += 1;
+      }
+
+      const code = t.template?.code ?? 'UNTEMPLATED';
+      const perTemplate = bucket.byTemplate.get(code) ?? {
+        code,
+        name: t.template?.name ?? 'No template',
+        generated: 0,
+        completed: 0,
+        cancelled: 0,
+      };
+      perTemplate.generated += 1;
+      if (done) perTemplate.completed += 1;
+      if (t.status === 'CANCELLED') perTemplate.cancelled += 1;
+      bucket.byTemplate.set(code, perTemplate);
+      buckets.set(t.outletId, bucket);
+    }
+
+    for (const f of followUps) {
+      const bucket = buckets.get(f.outletId);
+      if (!bucket) continue;
+      if (f.status !== 'COMPLETED' && f.status !== 'VERIFIED' && f.status !== 'CANCELLED') {
+        bucket.followUpsOpen += 1;
+      }
+    }
+
+    const outletCodes = new Map(tasks.map((t) => [t.outletId, t.outlet.code]));
+    const missing = await this.prisma.outlet.findMany({
+      where: { id: { in: outletIds.filter((id) => !outletCodes.has(id)) } },
+      select: { id: true, code: true },
+    });
+    for (const o of missing) {
+      const bucket = buckets.get(o.id);
+      if (bucket) bucket.outletCode = o.code;
+    }
+
+    return {
+      from: query.from,
+      to: query.to,
+      kind: query.kind,
+      failedItems,
+      data: [...buckets.values()]
+        .sort((a, b) => a.outletCode.localeCompare(b.outletCode))
+        .map((b) => {
+          const expected = b.generated - b.cancelled;
+          return {
+            outletId: b.outletId,
+            outletCode: b.outletCode,
+            generated: b.generated,
+            completed: b.completed,
+            cancelled: b.cancelled,
+            // null, not zero, when nothing was generated. A rate of 0 for a
+            // range with no checklists reads as total failure.
+            completionRate: expected === 0 ? null : round3(b.completed / expected),
+            onTimeRate: b.completed === 0 ? null : round3(b.onTime / b.completed),
+            followUpsOpen: b.followUpsOpen,
+            byTemplate: [...b.byTemplate.values()]
+              .sort((x, y) => x.code.localeCompare(y.code))
+              .map((t) => ({
+                code: t.code,
+                name: t.name,
+                generated: t.generated,
+                completed: t.completed,
+                completionRate:
+                  t.generated - t.cancelled === 0
+                    ? null
+                    : round3(t.completed / (t.generated - t.cancelled)),
+              })),
+          };
+        }),
+    };
   }
 
   async getOne(id: string, scope: RequestScope) {
@@ -1127,4 +1263,40 @@ function toCommentView(row: {
     body: row.body,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+interface ComplianceTemplate {
+  code: string;
+  name: string;
+  generated: number;
+  completed: number;
+  cancelled: number;
+}
+
+interface ComplianceBucket {
+  outletId: string;
+  outletCode: string;
+  generated: number;
+  completed: number;
+  cancelled: number;
+  onTime: number;
+  followUpsOpen: number;
+  byTemplate: Map<string, ComplianceTemplate>;
+}
+
+function emptyBucket(outletId: string, outletCode: string): ComplianceBucket {
+  return {
+    outletId,
+    outletCode,
+    generated: 0,
+    completed: 0,
+    cancelled: 0,
+    onTime: 0,
+    followUpsOpen: 0,
+    byTemplate: new Map(),
+  };
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
 }

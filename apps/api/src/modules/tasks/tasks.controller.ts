@@ -17,6 +17,7 @@ import {
   createCommentSchema,
   createTaskSchema,
   listTasksQuery,
+  complianceQuery,
   myTasksQuery,
   submitChecklistSchema,
   updateTaskSchema,
@@ -27,6 +28,7 @@ import {
   type CreateCommentDto,
   type CreateTaskDto,
   type ListTasksQuery,
+  type ComplianceQuery,
   type MyTasksQuery,
   type SubmitChecklistDto,
   type UpdateTaskDto,
@@ -71,6 +73,15 @@ export class TasksController {
     @Scope() scope: RequestScope,
   ) {
     return this.service.board(query, scope);
+  }
+
+  @Get('compliance')
+  @Permissions('task.task.read')
+  compliance(
+    @Query(new ZodValidationPipe(complianceQuery)) query: ComplianceQuery,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.service.compliance(query, scope);
   }
 
   @Get(':id')

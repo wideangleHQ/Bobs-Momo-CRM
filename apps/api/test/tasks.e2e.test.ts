@@ -808,7 +808,11 @@ describe('outlet scope and self scope', () => {
     expect(res.status).toBe(200);
     const rows = res.body?.['data'] as { assigneeId: string | null }[];
     expect(rows.length).toBeGreaterThan(0);
-    expect(rows.every((r) => r.assigneeId === cookEmployeeId)).toBe(true);
+    // Their own work or unassigned outlet work, never the manager's.
+    expect(
+      rows.every((r) => r.assigneeId === cookEmployeeId || r.assigneeId === null),
+    ).toBe(true);
+    expect(rows.some((r) => r.assigneeId === mgrEmployeeId)).toBe(false);
   });
 
   test('an unassigned outlet task reaches the cook through /tasks/my', async () => {
@@ -892,5 +896,66 @@ describe('compliance', () => {
   test('an inverted date range is refused', async () => {
     const res = await api('GET', '/tasks/compliance?from=2026-08-26&to=2026-08-01');
     expect(res.status).toBe(400);
+  });
+});
+
+// The list query pins assigneeId for a SELF grant. Reading by id did not, so a
+// cook could read any task at the outlet by pasting an id out of a notification.
+describe('SELF scope on reads', () => {
+  test('a cook cannot read a task detail belonging to somebody else', async () => {
+    const other = await api('POST', '/tasks', {
+      title: 'E2E Not the cook job',
+      outletId,
+      assigneeId: mgrEmployeeId,
+    });
+    const id = other.body?.['id'] as string;
+
+    // The manager who owns it still reads it.
+    expect((await api('GET', `/tasks/${id}`)).status).toBe(200);
+
+    // 404 and not 403: a 403 would confirm the id is real.
+    expect((await api('GET', `/tasks/${id}`, undefined, cookToken)).status).toBe(404);
+    expect((await api('GET', `/tasks/${id}/comments`, undefined, cookToken)).status).toBe(404);
+  });
+
+  test('a cook sees unassigned work at their outlet, and not other people work', async () => {
+    const unassigned = await api('POST', '/tasks', {
+      title: 'E2E Nobody has this yet',
+      outletId,
+    });
+    const mine = await api('POST', '/tasks', {
+      title: 'E2E The cook job',
+      outletId,
+      assigneeId: cookEmployeeId,
+    });
+    const theirs = await api('POST', '/tasks', {
+      title: 'E2E The manager job',
+      outletId,
+      assigneeId: mgrEmployeeId,
+    });
+
+    const res = await api('GET', '/tasks?pageSize=100', undefined, cookToken);
+    expect(res.status).toBe(200);
+    const ids = (res.body?.['data'] as { id: string }[]).map((t) => t.id);
+
+    // The recurrence generator creates checklist runs with no assignee. Pinning
+    // assigneeId strictly hid every opening checklist from the staff meant to
+    // run it, while assertMayAct would have let them start it.
+    expect(ids).toContain(unassigned.body?.['id'] as string);
+    expect(ids).toContain(mine.body?.['id'] as string);
+    expect(ids).not.toContain(theirs.body?.['id'] as string);
+  });
+
+  test('the compliance report is not readable by floor staff', async () => {
+    const today = toBusinessDate();
+    const res = await api(
+      'GET',
+      `/tasks/compliance?from=${today}&to=${today}`,
+      undefined,
+      cookToken,
+    );
+    // It is the per-outlet completion rate a manager is judged on.
+    expect(res.status).toBe(403);
+    expect((await api('GET', `/tasks/compliance?from=${today}&to=${today}`)).status).toBe(200);
   });
 });

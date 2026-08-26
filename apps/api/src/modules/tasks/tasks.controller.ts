@@ -75,8 +75,10 @@ export class TasksController {
     return this.service.board(query, scope);
   }
 
+  // Not task.task.read: floor staff hold that at SELF scope, and this is the
+  // per-outlet completion rate their manager is judged on.
   @Get('compliance')
-  @Permissions('task.task.read')
+  @Permissions('analytics.performance.read')
   compliance(
     @Query(new ZodValidationPipe(complianceQuery)) query: ComplianceQuery,
     @Scope() scope: RequestScope,

@@ -338,6 +338,7 @@ export class TasksService {
   async getOne(id: string, scope: RequestScope) {
     const task = await this.prisma.task.findUnique({ where: { id }, include: TASK_DETAIL_INCLUDE });
     if (!task || !scope.outletIds.includes(task.outletId)) throw this.notFound();
+    this.assertMayRead(task, scope);
 
     const parent = task.parentTaskId
       ? await this.prisma.task.findUnique({
@@ -578,7 +579,7 @@ export class TasksService {
   }
 
   async listComments(id: string, scope: RequestScope) {
-    await this.load(id, scope);
+    this.assertMayRead(await this.load(id, scope), scope);
     const rows = await this.prisma.taskComment.findMany({
       where: { taskId: id },
       orderBy: { createdAt: 'asc' },
@@ -1004,13 +1005,22 @@ export class TasksService {
       : scope.outletIds;
     if (query.outletId && outletIds.length === 0) throw DomainError.notFound();
 
-    // A caller who only holds SELF sees their own work and nothing else, even
-    // when they ask for somebody else's employee id.
-    const assigneeId = scope.selfEmployeeId ?? query.assigneeId;
+    // A SELF caller sees their own work plus anything unassigned at their
+    // outlet, and never somebody else's, even when they ask for that employee
+    // id. Unassigned matters: the recurrence generator creates checklist runs
+    // with no assignee, so pinning assigneeId strictly hid every opening and
+    // closing checklist from the staff who are supposed to run them. The rule
+    // matches assertMayRead and assertMayAct, so the list, the detail and the
+    // ability to act now agree with each other.
+    const selfFilter: Prisma.TaskWhereInput = scope.selfEmployeeId
+      ? { OR: [{ assigneeId: scope.selfEmployeeId }, { assigneeId: null }] }
+      : query.assigneeId
+        ? { assigneeId: query.assigneeId }
+        : {};
 
     return {
       outletId: { in: outletIds },
-      ...(assigneeId ? { assigneeId } : {}),
+      ...selfFilter,
       ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.status ? { status: { in: query.status } } : {}),
@@ -1107,6 +1117,18 @@ export class TasksService {
         },
       },
     });
+  }
+
+  /**
+   * The list query pins assigneeId for a SELF grant, so reading by id had to do
+   * the same or the scoping was decorative: task ids travel in notification
+   * payloads, and a chef could read another cook's assignments and comments by
+   * pasting one. 404 rather than 403, so an id cannot be confirmed as real.
+   */
+  private assertMayRead(task: { assigneeId: string | null }, scope: RequestScope): void {
+    if (scope.selfEmployeeId === null) return;
+    if (task.assigneeId === null || task.assigneeId === scope.selfEmployeeId) return;
+    throw this.notFound();
   }
 
   private assertMayAct(task: { assigneeId: string | null }, scope: RequestScope): void {

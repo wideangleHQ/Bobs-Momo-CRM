@@ -1,0 +1,34 @@
+[book]
+title = "Bob's Momo ERP & CRM: Phase 1 Engineering Handbook"
+authors = ["Wide Angle Media and Technologies"]
+description = "Implementation-level handbook for the Phase 1 build of the Bob's Momo ERP and CRM, expanded from the signed SRS."
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/wideanglehq/bobs-momo-crm"
+edit-url-template = "https://github.com/wideanglehq/bobs-momo-crm/edit/main/book/{path}"
+no-section-label = false
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
+limit-results = 30
+use-boolean-and = true
+boost-title = 2
+boost-hierarchy = 2
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.print]
+enable = true

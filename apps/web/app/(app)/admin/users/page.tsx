@@ -33,6 +33,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [credential, setCredential] = useState<ProvisionedCredential | null>(null);
   const [resetting, setResetting] = useState<AdminUser | null>(null);
+  const [disablingId, setDisabling] = useState<string | null>(null);
   const [reason, setReason] = useState('');
 
   const filters = { q: q.trim() || undefined, page, pageSize: 25 };
@@ -149,19 +150,56 @@ export default function AdminUsersPage() {
                       </Button>
                     ) : null}
                     {can('admin.user.disable') ? (
+                      // Re-enabling is harmless and stays one tap. Disabling
+                      // revokes a working login and every live session, so it
+                      // asks first, like the password reset on this same row.
                       <Button
                         type="button"
                         variant="secondary"
                         className="min-h-[44px]"
                         disabled={toggle.isPending}
                         onClick={() =>
-                          toggle.mutate({ id: user.id, status: disabled ? 'ACTIVE' : 'DISABLED' })
+                          disabled
+                            ? toggle.mutate({ id: user.id, status: 'ACTIVE' })
+                            : setDisabling(user.id)
                         }
                       >
                         {disabled ? 'Re-enable' : 'Disable'}
                       </Button>
                     ) : null}
                   </div>
+
+                  {disablingId === user.id ? (
+                    <div className="mt-3 space-y-2 rounded-lg border border-border bg-surface-muted p-3">
+                      <p className="text-sm">
+                        Disable {user.username}? They are signed out everywhere and cannot
+                        sign back in until somebody re-enables them.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="min-h-[44px]"
+                          disabled={toggle.isPending}
+                          onClick={() => {
+                            toggle.mutate({ id: user.id, status: 'DISABLED' });
+                            setDisabling(null);
+                          }}
+                        >
+                          Yes, disable
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="min-h-[44px]"
+                          disabled={toggle.isPending}
+                          onClick={() => setDisabling(null)}
+                        >
+                          Keep active
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {resetting?.id === user.id ? (
                     <form

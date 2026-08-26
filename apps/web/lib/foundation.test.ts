@@ -1,6 +1,6 @@
 import { expect, test, afterEach } from 'bun:test';
 import { money, qty, shortDate, longDate, time, relative, duration } from './format';
-import { apiGet, ApiError, setAccessToken } from './api';
+import { apiGet, ApiError, errorMessage, setAccessToken } from './api';
 
 test('money uses Indian grouping and two decimals', () => {
   expect(money('4427.5')).toBe('Rs 4,427.50');
@@ -78,4 +78,25 @@ test('an error envelope becomes an ApiError carrying code and requestId', async 
     requestId: '01JTEST',
   });
   expect(new ApiError(422, 'X', 'y')).toBeInstanceOf(Error);
+});
+
+// A lockout that says "try again shortly" for a twelve minute wait teaches the
+// user nothing, so they keep retrying. The API sends the seconds; show them.
+test('errorMessage surfaces the lockout wait time', () => {
+  const locked = new ApiError(423, 'AUTH_ACCOUNT_LOCKED', 'Too many attempts. Try again shortly', {
+    retryAfterSeconds: 741,
+  });
+  expect(errorMessage(locked)).toBe('Too many attempts. Try again shortly. Try again in 13 minutes');
+
+  const nearly = new ApiError(423, 'AUTH_ACCOUNT_LOCKED', 'Too many attempts', {
+    retryAfterSeconds: 45,
+  });
+  expect(errorMessage(nearly)).toBe('Too many attempts. Try again in 45 seconds');
+
+  const one = new ApiError(429, 'COMMON_RATE_LIMITED', 'Slow down', { retryAfterSeconds: 60 });
+  expect(errorMessage(one)).toBe('Slow down. Try again in 1 minute');
+
+  // No retry hint means no invented one.
+  const plain = new ApiError(401, 'AUTH_INVALID_CREDENTIALS', 'Wrong username or password');
+  expect(errorMessage(plain)).toBe('Wrong username or password');
 });

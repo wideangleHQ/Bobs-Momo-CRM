@@ -155,13 +155,40 @@ export default function PurchaseRequestDetailPage() {
           ) : null}
 
           {canCancel ? (
-            <Button
-              onClick={() => decide.mutate('cancel')}
-              disabled={decide.isPending}
-              variant="secondary" size="lg" fullWidth
-            >
-              Cancel this request
-            </Button>
+            confirming === 'cancel' ? (
+              <div className="space-y-2 rounded-lg border border-border bg-surface-muted p-3">
+                <p className="text-sm text-text">
+                  Cancel this request? It cannot be reopened, and a new one has to be raised.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => decide.mutate('cancel')}
+                    disabled={decide.isPending}
+                    variant="danger" size="lg" fullWidth
+                  >
+                    Yes, cancel it
+                  </Button>
+                  <Button
+                    onClick={() => setConfirming(null)}
+                    disabled={decide.isPending}
+                    variant="secondary" size="lg" fullWidth
+                  >
+                    Keep it
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              // Two steps, like reject directly above. This sits under the
+              // reject button on a 360px screen and one fat-thumb tap used to
+              // destroy a request the manager was waiting on.
+              <Button
+                onClick={() => setConfirming('cancel')}
+                disabled={decide.isPending}
+                variant="secondary" size="lg" fullWidth
+              >
+                Cancel this request
+              </Button>
+            )
           ) : null}
         </div>
       ) : null}

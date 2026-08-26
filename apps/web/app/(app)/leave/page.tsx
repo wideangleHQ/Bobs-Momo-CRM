@@ -36,6 +36,7 @@ export default function MyLeavePage() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<LeaveStatus | ''>('');
   const [problem, setProblem] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // A manager reading this screen wants their own leave, not the queue. The
   // queue is /leave/approvals.
@@ -137,15 +138,46 @@ export default function MyLeavePage() {
                   <p className="text-sm text-text-muted">Manager said: {l.decisionNote}</p>
                 ) : null}
                 {l.status === 'PENDING' ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="min-h-[44px] w-full"
-                    disabled={withdraw.isPending}
-                    onClick={() => withdraw.mutate(l.id)}
-                  >
-                    Withdraw this request
-                  </Button>
+                  confirmingId === l.id ? (
+                    <div className="space-y-2 rounded-lg border border-border bg-surface-muted p-3">
+                      <p className="text-sm">
+                        Withdraw this request? You would have to raise it again.
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="danger"
+                          className="min-h-[44px] w-full"
+                          disabled={withdraw.isPending}
+                          onClick={() => withdraw.mutate(l.id)}
+                        >
+                          Yes, withdraw
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="min-h-[44px] w-full"
+                          disabled={withdraw.isPending}
+                          onClick={() => setConfirmingId(null)}
+                        >
+                          Keep it
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Full width, directly under the card body, exactly where a
+                    // thumb scrolls. One mis-tap used to destroy a request the
+                    // employee had to have a conversation to get.
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-[44px] w-full"
+                      disabled={withdraw.isPending}
+                      onClick={() => setConfirmingId(l.id)}
+                    >
+                      Withdraw this request
+                    </Button>
+                  )
                 ) : null}
               </Card>
             </li>

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { createLeaveSchema, LEAVE_TYPES } from '@bobs-momo/shared';
+import { LEAVE_TYPES, createLeaveSchema, toBusinessDate } from '@bobs-momo/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,7 +23,7 @@ const TYPE_LABELS: Record<LeaveType, string> = {
 export default function RequestLeavePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = toBusinessDate();
 
   const [type, setType] = useState<LeaveType>('CASUAL');
   const [fromDate, setFromDate] = useState(today);

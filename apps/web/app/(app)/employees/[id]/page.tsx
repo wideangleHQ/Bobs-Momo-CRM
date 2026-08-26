@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { exitEmployeeSchema } from '@bobs-momo/shared';
+import { exitEmployeeSchema, toBusinessDate } from '@bobs-momo/shared';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,7 +31,7 @@ export default function EmployeeProfilePage() {
   const [editing, setEditing] = useState(false);
   const [exiting, setExiting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [exitedOn, setExitedOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [exitedOn, setExitedOn] = useState(() => toBusinessDate());
   const [exitReason, setExitReason] = useState('');
 
   const employee = useQuery({

@@ -13,11 +13,12 @@ import { useCan } from '@/lib/auth';
 import { longDate } from '@/lib/format';
 import { istHhmm, listShifts } from '@/features/workforce/api';
 import { workforceKeys } from '@/features/workforce/keys';
+import { businessDateOffset, toBusinessDate } from '@bobs-momo/shared';
 
 export default function MyShiftsPage() {
   const can = useCan();
-  const from = new Date().toISOString().slice(0, 10);
-  const to = new Date(Date.now() + 27 * 86_400_000).toISOString().slice(0, 10);
+  const from = toBusinessDate();
+  const to = businessDateOffset(27).toISOString().slice(0, 10);
   const query = { from, to, pageSize: 50 };
 
   const shifts = useQuery({

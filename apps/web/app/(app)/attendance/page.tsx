@@ -24,6 +24,7 @@ import {
   type PunchState,
 } from '@/features/workforce/api';
 import { workforceKeys } from '@/features/workforce/keys';
+import { toBusinessDate } from '@bobs-momo/shared';
 
 type Attempt = 'IN' | 'OUT';
 
@@ -62,7 +63,10 @@ export default function AttendancePunchPage() {
     refetchOnWindowFocus: true,
   });
 
-  const today = new Date(now).toISOString().slice(0, 10);
+  // The 04:00 IST boundary, not the UTC date. Between midnight and 05:30 the
+  // two differ, so a 05:00 prep shift looked up yesterday's roster and the
+  // late-or-on-time line was wrong for exactly the staff who start earliest.
+  const today = toBusinessDate(new Date(now));
   const shift = useQuery({
     queryKey: workforceKeys.shifts({ from: today, to: today, employeeId }),
     queryFn: () => listShifts({ from: today, to: today, pageSize: 5 }),

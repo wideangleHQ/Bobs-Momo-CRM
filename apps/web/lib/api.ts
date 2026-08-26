@@ -171,8 +171,26 @@ export function errorMessage(err: unknown): string {
       const ref = err.requestId ? ` Reference ${err.requestId}.` : '';
       return `Something went wrong on our side. Nothing you typed was lost.${ref}`;
     }
+    // A lockout says "try again shortly", which can mean twelve minutes. The
+    // API sends the actual number of seconds, so say it: somebody who does not
+    // know how long to wait keeps retrying and learns nothing.
+    const wait = retryAfterSeconds(err);
+    if (wait !== null) return `${err.message}. ${waitPhrase(wait)}`;
     return err.message;
   }
   if (err instanceof Error) return err.message;
   return 'Something went wrong. Try again.';
+}
+
+function retryAfterSeconds(err: ApiError): number | null {
+  const details = err.details;
+  if (typeof details !== 'object' || details === null) return null;
+  const value = (details as { retryAfterSeconds?: unknown }).retryAfterSeconds;
+  return typeof value === 'number' && value > 0 ? value : null;
+}
+
+function waitPhrase(seconds: number): string {
+  if (seconds < 60) return `Try again in ${seconds} seconds`;
+  const minutes = Math.ceil(seconds / 60);
+  return `Try again in ${minutes} minute${minutes === 1 ? '' : 's'}`;
 }

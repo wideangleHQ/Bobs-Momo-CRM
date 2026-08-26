@@ -17,9 +17,10 @@ import { longDate, time } from '@/lib/format';
 import { hm, listAttendance, type AttendanceDayRow } from '@/features/workforce/api';
 import { workforceKeys } from '@/features/workforce/keys';
 import { PunchEditDialog } from '@/features/workforce/punch-edit-dialog';
+import { businessDateOffset } from '@bobs-momo/shared';
 
 function isoDaysAgo(days: number): string {
-  return new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  return businessDateOffset(-days).toISOString().slice(0, 10);
 }
 
 export default function AttendanceHistoryPage() {

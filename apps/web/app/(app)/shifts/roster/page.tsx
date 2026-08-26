@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { bulkShiftSchema, createShiftSchema } from '@bobs-momo/shared';
+import { bulkShiftSchema, createShiftSchema, toBusinessDate } from '@bobs-momo/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -31,7 +31,7 @@ const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function RosterPage() {
   const queryClient = useQueryClient();
-  const [weekStart, setWeekStart] = useState(() => mondayOf(new Date().toISOString().slice(0, 10)));
+  const [weekStart, setWeekStart] = useState(() => mondayOf(toBusinessDate()));
   const [cell, setCell] = useState<{ employeeId: string; date: string } | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
 

@@ -398,3 +398,68 @@ describe('the ledger still reconciles', () => {
     }
   });
 });
+
+// The RECORDED check used to sit outside the transaction with no status guard
+// on the write, so two concurrent voids both applied compensating rows and
+// stock came off twice. The ledger still summed to qtyOnHand, so no consistency
+// check could catch it: the balance was simply wrong by the size of the bill.
+describe('concurrent void', () => {
+  test('two voids at once reverse the stock exactly once', async () => {
+    const created = await api('POST', '/purchases', {
+      outletId,
+      vendorId,
+      purchaseDate: toBusinessDate(),
+      lines: [{ itemId: itemA, quantity: 9, unitPrice: 100 }],
+    });
+    const id = created.body?.['id'] as string;
+
+    const before = await prisma.itemStock.findUniqueOrThrow({
+      where: { itemId_outletId: { itemId: itemA, outletId } },
+    });
+
+    const results = await Promise.all([
+      api('POST', `/purchases/${id}/void`, { reason: 'Double tap one' }),
+      api('POST', `/purchases/${id}/void`, { reason: 'Double tap two' }),
+    ]);
+    const statuses = results.map((r) => r.status).sort();
+    expect(statuses).toEqual([200, 409]);
+
+    const after = await prisma.itemStock.findUniqueOrThrow({
+      where: { itemId_outletId: { itemId: itemA, outletId } },
+    });
+    // Exactly 9 back off, not 18.
+    expect(Number(before.qtyOnHand) - Number(after.qtyOnHand)).toBeCloseTo(9, 3);
+
+    const reversals = await prisma.stockTransaction.count({
+      where: { sourceType: 'PURCHASE_VOID', sourceId: id },
+    });
+    expect(reversals).toBe(1);
+  });
+
+  test('two purchases cannot both fulfil one approved request', async () => {
+    const request = await api(
+      'POST',
+      '/purchase-requests',
+      { outletId, lines: [{ itemId: itemA, quantity: 4 }] },
+      askerToken,
+    );
+    const requestId = request.body?.['id'] as string;
+    await api('POST', `/purchase-requests/${requestId}/approve`, {});
+
+    const body = {
+      outletId,
+      vendorId,
+      requestId,
+      purchaseDate: toBusinessDate(),
+      lines: [{ itemId: itemA, quantity: 4, unitPrice: 50 }],
+    };
+    const results = await Promise.all([
+      api('POST', '/purchases', body),
+      api('POST', '/purchases', body),
+    ]);
+    const ok = results.filter((r) => r.status === 201);
+    // One receives the stock. The other is told the request is spoken for.
+    expect(ok.length).toBe(1);
+    expect(results.filter((r) => r.status === 409).length).toBe(1);
+  });
+});

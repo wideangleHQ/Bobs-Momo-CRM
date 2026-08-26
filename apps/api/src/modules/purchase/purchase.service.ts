@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import {
   ERROR_CODES,
   paginate,
+  toBusinessDate,
   type CreatePurchaseDto,
   type ListPurchasesQuery,
   type PriceHistoryQuery,
@@ -215,10 +216,19 @@ export class PurchaseService {
       }
 
       if (dto.requestId) {
-        await tx.purchaseRequest.update({
-          where: { id: dto.requestId },
+        // Conditional, for the same reason as the void: assertTransition above
+        // runs outside this transaction, so two purchases could both fulfil one
+        // approved request and both receive the stock.
+        const fulfilled = await tx.purchaseRequest.updateMany({
+          where: { id: dto.requestId, status: 'APPROVED' },
           data: { status: 'FULFILLED' },
         });
+        if (fulfilled.count === 0) {
+          throw DomainError.conflict(
+            ERROR_CODES.PR_INVALID_TRANSITION,
+            'That request has already been fulfilled',
+          );
+        }
       }
 
       await tx.outboxEvent.create({
@@ -260,6 +270,22 @@ export class PurchaseService {
     }
 
     const voided = await this.prisma.$transaction(async (tx) => {
+      // Claim the void before doing any of the work. The check above is outside
+      // the transaction, so two concurrent voids both passed it and both
+      // applied compensating rows: stock came off twice, and because the ledger
+      // still summed to qtyOnHand no consistency check could catch it. The
+      // balance was simply wrong by the size of the bill.
+      const claimed = await tx.purchase.updateMany({
+        where: { id, status: 'RECORDED' },
+        data: { status: 'VOIDED', voidedAt: new Date(), voidReason: dto.reason },
+      });
+      if (claimed.count === 0) {
+        throw DomainError.conflict(
+          ERROR_CODES.PURCHASE_ALREADY_VOIDED,
+          'That purchase has already been voided',
+        );
+      }
+
       for (const line of purchase.items) {
         // ADJUSTMENT rather than a negative RECEIVED, because ADJUSTMENT is the
         // one type allowed to drive the balance below zero. If the kitchen
@@ -273,7 +299,11 @@ export class PurchaseService {
             outletId: purchase.outletId,
             type: 'ADJUSTMENT',
             signedQty: line.quantity.negated(),
-            businessDate: new Date().toISOString().slice(0, 10),
+            // toBusinessDate, not toISOString: between 04:00 and 05:30 IST the
+            // UTC date is still yesterday while the trading day has rolled
+            // over, so the reversal landed on the wrong day and both days'
+            // consumption reports were off by this purchase.
+            businessDate: toBusinessDate(),
             reason: `Void of ${purchase.purchaseNo}: ${dto.reason}`,
             sourceType: 'PURCHASE_VOID',
             sourceId: purchase.id,
@@ -286,11 +316,7 @@ export class PurchaseService {
       // paperwork was wrong, not that the price observation was false, and
       // deleting observations whenever a bill is re-keyed would put holes in
       // exactly the series the owner bought this system for.
-      return tx.purchase.update({
-        where: { id },
-        data: { status: 'VOIDED', voidedAt: new Date(), voidReason: dto.reason },
-        include: PURCHASE_INCLUDE,
-      });
+      return tx.purchase.findUniqueOrThrow({ where: { id }, include: PURCHASE_INCLUDE });
     });
 
     return toPurchaseView(voided);

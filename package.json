@@ -15,7 +15,7 @@
     "db:seed": "bun run --cwd apps/api db:seed",
     "db:reset": "bun run --cwd apps/api db:reset",
     "db:studio": "bun run --cwd apps/api db:studio",
-    "test": "bun test packages/shared && bun run --cwd apps/api test"
+    "test": "bun test packages/shared && bun test apps/web && bun run --cwd apps/api test"
   },
   "devDependencies": {
     "@eslint/js": "^9.21.0",

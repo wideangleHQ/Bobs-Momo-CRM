@@ -23,6 +23,7 @@ export default ts.config(
             '*.mjs',
             'apps/web/*.mjs',
             'scripts/*.mjs',
+            'scripts/*.ts',
             'packages/shared/src/*.test.ts',
           ],
         },

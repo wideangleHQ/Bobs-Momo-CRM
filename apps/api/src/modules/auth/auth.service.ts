@@ -252,6 +252,12 @@ export class AuthService {
     };
   }
 
+  async me(userId: string) {
+    const user = (await this.repo.findUserById(userId)) as UserWithScope | null;
+    if (!user) throw DomainError.notFound();
+    return this.profile(user);
+  }
+
   async profile(user: UserWithScope) {
     const { outletIds, scope } = await this.resolveScope(user);
     return {

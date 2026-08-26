@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -71,6 +72,15 @@ export class AuthController {
       this.clearCookie(res);
       throw e;
     }
+  }
+
+  // The refresh response carries only a token, so a browser reload has nothing
+  // to rebuild a display name from. This is that endpoint.
+  @Get('me')
+  @Permissions('auth.session.create')
+  @AllowMustReset()
+  me(@CurrentUser() user: AuthedUser) {
+    return this.auth.me(user.sub);
   }
 
   @Post('logout')

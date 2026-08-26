@@ -41,6 +41,14 @@ export default ts.config(
   {
     // Node scripts, not part of any app bundle.
     files: ['**/*.mjs'],
-    languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
+    languageOptions: {
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        Intl: 'readonly',
+        URL: 'readonly',
+      },
+    },
   },
 );

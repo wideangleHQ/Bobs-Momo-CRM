@@ -144,7 +144,11 @@ export class TasksService {
    * kitchen.
    */
   async my(query: MyTasksQuery, user: AuthedUser, scope: RequestScope) {
-    const employeeId = this.actorEmployeeId(user);
+    // The owner has a login and no employee record, which is a real account
+    // shape rather than a mistake. Tasks assigned to them is genuinely the
+    // empty set, and a 403 on "my tasks" reads as a broken app.
+    if (!user.employeeId) return { overdue: [], today: [], upcoming: [] };
+    const employeeId = user.employeeId;
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
       select: { outletId: true, departmentId: true },

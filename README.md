@@ -1,7 +1,24 @@
 # Bob's Momo ERP & CRM
 
-Phase 1 engineering handbook, expanded from the signed SRS in
-[book/docs/Bobs_Momo_ERP_CRM_SRS.md](book/docs/Bobs_Momo_ERP_CRM_SRS.md).
+Operations, workforce, inventory and reporting for two quick service outlets in
+Bhubaneswar. Built from the signed SRS in
+[book/docs/Bobs_Momo_ERP_CRM_SRS.md](book/docs/Bobs_Momo_ERP_CRM_SRS.md) and the
+Phase 1 handbook in [book/src/](book/src/).
+
+## What is here
+
+| Part | What it does |
+|---|---|
+| `apps/api` | NestJS 11 on Node 22, Prisma 6, PostgreSQL 15, Redis |
+| `apps/web` | Next.js 15 App Router, React 19, Tailwind 4, TanStack Query |
+| `packages/shared` | Zod schemas, the permission matrix, the error registry |
+| `book` | The 42 chapter engineering handbook |
+
+Modules: authentication and RBAC, inventory and the stock ledger, purchase and
+vendors, workforce (employees, attendance, shifts, leave, salary), the shared
+task engine with checklists and audits, notifications over an outbox with a
+WhatsApp adapter, internal messaging, daily sales, analytics, administration,
+and the customer game and reward layer.
 
 ## Run it locally
 
@@ -22,7 +39,11 @@ Check it came up:
 
 ```bash
 curl -s localhost:3001/api/v1/health/readyz   # {"status":"ok","db":"up","redis":"up"}
+bun run scripts/smoke.mjs http://localhost:3001/api/v1 owner 'ChangeMe123!'
 ```
+
+`just setup` does the whole of the above in one command, and `just validate-all`
+runs exactly what CI runs.
 
 Full setup notes, including the troubleshooting table, are in
 [book/src/08-repository-and-local-setup.md](book/src/08-repository-and-local-setup.md).

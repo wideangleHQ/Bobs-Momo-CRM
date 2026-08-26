@@ -43,14 +43,17 @@ export class CrmController {
 
   @Get('customers')
   @Permissions('crm.customer.read')
-  listCustomers(@Query(new ZodValidationPipe(listCustomersQuery)) query: ListCustomersQuery) {
-    return this.crm.listCustomers(query);
+  listCustomers(
+    @Query(new ZodValidationPipe(listCustomersQuery)) query: ListCustomersQuery,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.crm.listCustomers(query, scope);
   }
 
   @Get('customers/:id')
   @Permissions('crm.customer.read')
-  getCustomer(@Param('id', ParseUUIDPipe) id: string) {
-    return this.crm.getCustomer(id);
+  getCustomer(@Param('id', ParseUUIDPipe) id: string, @Scope() scope: RequestScope) {
+    return this.crm.getCustomer(id, scope);
   }
 
   @Get('game-config')

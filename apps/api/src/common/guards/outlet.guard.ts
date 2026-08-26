@@ -50,11 +50,11 @@ export class OutletGuard implements CanActivate {
       if (!allowed.includes(asked)) {
         throw new DomainError(HttpStatus.NOT_FOUND, ERROR_CODES.COMMON_NOT_FOUND, 'Not found');
       }
-      req.scope = { outletIds: [asked], selfEmployeeId: null };
+      req.scope = { outletIds: [asked], selfEmployeeId: null, allOutlets: grant.modifier === 'A' };
     } else {
       // No outletId supplied: narrow rather than reject, so a list endpoint
       // works for both a single-outlet manager and the owner without a param.
-      req.scope = { outletIds: allowed, selfEmployeeId: null };
+      req.scope = { outletIds: allowed, selfEmployeeId: null, allOutlets: grant.modifier === 'A' };
     }
 
     if (grant.modifier === 'S' && !ACCOUNT_SELF_KEYS.has(grant.key)) {

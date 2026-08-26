@@ -46,15 +46,30 @@ export class CrmService {
 
   // ---- customers ---------------------------------------------------------
 
-  async listCustomers(query: ListCustomersQuery) {
-    const where: Prisma.CustomerWhereInput = query.search
-      ? {
-          OR: [
-            { phone: { contains: query.search } },
-            { name: { contains: query.search, mode: 'insensitive' } },
-          ],
-        }
-      : {};
+  /**
+   * Customer carries no outlet column, so an OWN_OUTLET grant has nothing to
+   * filter on directly. The only outlet linkage in the data is where a coupon
+   * was redeemed, so an outlet-scoped caller sees the customers who have
+   * actually redeemed at one of their shops. A customer who has never been to
+   * that outlet is not their business. An ALL_OUTLETS caller sees everyone.
+   */
+  private outletNarrowing(scope: RequestScope): Prisma.CustomerWhereInput {
+    if (scope.allOutlets) return {};
+    return { rewards: { some: { redeemedOutletId: { in: scope.outletIds } } } };
+  }
+
+  async listCustomers(query: ListCustomersQuery, scope: RequestScope) {
+    const where: Prisma.CustomerWhereInput = {
+      ...this.outletNarrowing(scope),
+      ...(query.search
+        ? {
+            OR: [
+              { phone: { contains: query.search } },
+              { name: { contains: query.search, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.customer.findMany({
@@ -83,9 +98,11 @@ export class CrmService {
     );
   }
 
-  async getCustomer(id: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id },
+  async getCustomer(id: string, scope: RequestScope) {
+    const customer = await this.prisma.customer.findFirst({
+      // findFirst, not findUnique, so the outlet narrowing can join. An
+      // out-of-scope customer reads as not existing, same as everywhere else.
+      where: { id, ...this.outletNarrowing(scope) },
       include: {
         gamePlays: {
           orderBy: { playedAt: 'desc' },

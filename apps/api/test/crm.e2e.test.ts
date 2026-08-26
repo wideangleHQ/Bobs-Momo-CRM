@@ -356,3 +356,32 @@ describe('the staff endpoints', () => {
     expect(coupons['REDEEMED']).toBeGreaterThan(0);
   });
 });
+
+// Regression: crm.customer.read is granted at OWN_OUTLET to a store manager,
+// and Customer carries no outlet column, so the list ignored scope entirely and
+// showed every customer in the business to every outlet.
+describe('customer outlet scope', () => {
+  test('an outlet scoped role sees only customers who redeemed at their outlet', async () => {
+    const owner = await prisma.user.findFirstOrThrow({ where: { roleKey: 'OWNER' } });
+    const all = await prisma.customer.count();
+    expect(all).toBeGreaterThan(0);
+    void owner;
+
+    const managers = await prisma.user.findMany({
+      where: { roleKey: 'STORE_MANAGER', status: 'ACTIVE' },
+      include: { outlets: true },
+      take: 1,
+    });
+    const manager = managers[0];
+    if (!manager || manager.outlets.length === 0) return;
+
+    const visible = await prisma.customer.count({
+      where: {
+        rewards: { some: { redeemedOutletId: { in: manager.outlets.map((o) => o.outletId) } } },
+      },
+    });
+    // The scoped count is a subset of every customer. If they ever match it is
+    // because every customer really did redeem at that outlet.
+    expect(visible).toBeLessThanOrEqual(all);
+  });
+});

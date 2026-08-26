@@ -22,6 +22,13 @@ export interface Grant {
 export interface RequestScope {
   outletIds: string[];
   selfEmployeeId: string | null;
+  /**
+   * True when the grant was ALL_OUTLETS. Not the same as "outletIds happens to
+   * contain every outlet today": a store manager at the only open shop must
+   * still be treated as outlet scoped, or opening a second shop silently widens
+   * what they can see.
+   */
+  allOutlets: boolean;
 }
 
 export interface AuthedRequest extends Request {

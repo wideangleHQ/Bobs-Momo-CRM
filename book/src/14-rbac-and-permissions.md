@@ -271,7 +271,7 @@ Columns are the nine roles, abbreviated to keep the table on screen.
 | `crm.reward.redeem` | A | A | O | | | | | | O |
 | `crm.analytics.read` | A | A | O | | | | | | |
 
-That is 95 keys. The public game endpoints that a customer's browser hits carry
+That is 84 keys. The public game endpoints that a customer's browser hits carry
 no key at all: they are unauthenticated, rate limited, and covered in the CRM
 chapter.
 
@@ -279,7 +279,7 @@ chapter.
 
 ### Owner
 
-Bob holds all 95 keys at `ALL_OUTLETS`. Four of them are his alone:
+Bob holds all 84 keys at `ALL_OUTLETS`. Four of them are his alone:
 `admin.user.assign_role`, `admin.outlet.manage`, `sales.entry.unlock` and
 `analytics.pnl.read`. Everything a manager can do, he can do, at either outlet,
 without asking. He will most likely complain that the dashboard opens on today

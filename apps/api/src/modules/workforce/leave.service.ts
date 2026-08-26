@@ -175,14 +175,27 @@ export class LeaveService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const row = await tx.leaveRequest.update({
-        where: { id },
+      // Conditional on PENDING inside the transaction. The check above runs
+      // outside it, so a manager approving while another rejects had both reads
+      // see PENDING: the row landed on one status while writeLeaveDays had
+      // already painted ON_LEAVE across the board for the other.
+      const claimed = await tx.leaveRequest.updateMany({
+        where: { id, status: 'PENDING' },
         data: {
           status: to,
           decidedById: user.sub,
           decidedAt: new Date(),
           decisionNote: dto.decisionNote ?? null,
         },
+      });
+      if (claimed.count === 0) {
+        throw DomainError.conflict(
+          ERROR_CODES.LEAVE_NOT_PENDING,
+          'That request has already been decided',
+        );
+      }
+      const row = await tx.leaveRequest.findUniqueOrThrow({
+        where: { id },
         include: LEAVE_INCLUDE,
       });
 
@@ -284,13 +297,23 @@ export class LeaveService {
     toDate: Date,
   ): Promise<void> {
     for (let d = new Date(fromDate); d <= toDate; d = new Date(d.getTime() + 86_400_000)) {
-      await tx.attendanceDay.upsert({
-        where: { employeeId_businessDate: { employeeId, businessDate: d } },
-        create: { employeeId, outletId, businessDate: d, status: 'ON_LEAVE' },
-        // A day the employee actually worked is left alone. Somebody who came
-        // in anyway is present, whatever the form says.
-        update: { status: 'ON_LEAVE' },
+      // A day the employee actually worked is left alone. Somebody who came in
+      // anyway is present, whatever the form says. The upsert used to overwrite
+      // unconditionally, so a manager filing backdated sick leave across a day
+      // the cook had worked turned PRESENT into ON_LEAVE, and the attendance
+      // consistency report drops ON_LEAVE from its denominator, so the worked
+      // day vanished from the record with nothing to recompute it.
+      const marked = await tx.attendanceDay.updateMany({
+        where: { employeeId, businessDate: d, status: 'ABSENT' },
+        data: { status: 'ON_LEAVE' },
       });
+      if (marked.count === 0) {
+        await tx.attendanceDay.upsert({
+          where: { employeeId_businessDate: { employeeId, businessDate: d } },
+          create: { employeeId, outletId, businessDate: d, status: 'ON_LEAVE' },
+          update: {},
+        });
+      }
     }
   }
 

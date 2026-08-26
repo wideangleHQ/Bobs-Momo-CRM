@@ -443,3 +443,81 @@ describe('salary', () => {
     }
   });
 });
+
+// writeLeaveDays used to overwrite unconditionally, contradicting its own
+// comment. A manager filing backdated sick leave across a day the cook had
+// actually worked turned PRESENT into ON_LEAVE, and the attendance consistency
+// report drops ON_LEAVE from its denominator, so the worked day vanished with
+// nothing left to recompute it.
+describe('approved leave does not erase a worked day', () => {
+  test('a day the employee worked stays PRESENT', async () => {
+    const worked = new Date(`${toBusinessDate()}T00:00:00.000Z`);
+    await prisma.attendanceDay.upsert({
+      where: { employeeId_businessDate: { employeeId: staffEmployeeId, businessDate: worked } },
+      create: {
+        employeeId: staffEmployeeId,
+        outletId,
+        businessDate: worked,
+        status: 'PRESENT',
+        workedMins: 480,
+      },
+      update: { status: 'PRESENT', workedMins: 480 },
+    });
+
+    const today = toBusinessDate();
+    const filed = await api(
+      'POST',
+      '/leave-requests',
+      {
+        employeeId: staffEmployeeId,
+        type: 'SICK',
+        fromDate: today,
+        toDate: today,
+        reason: 'Filed the next morning',
+      },
+      mgrToken,
+    );
+    expect(filed.status).toBe(201);
+    const approved = await api(
+      'POST',
+      `/leave-requests/${filed.body?.['id'] as string}/approve`,
+      {},
+      mgrToken,
+    );
+    expect(approved.status).toBe(200);
+
+    const day = await prisma.attendanceDay.findUniqueOrThrow({
+      where: { employeeId_businessDate: { employeeId: staffEmployeeId, businessDate: worked } },
+    });
+    // He came in anyway. The form does not get to say otherwise.
+    expect(day.status).toBe('PRESENT');
+    expect(day.workedMins).toBe(480);
+  });
+
+  test('an absent day still becomes ON_LEAVE', async () => {
+    const future = new Date(Date.now() + 20 * 86_400_000).toISOString().slice(0, 10);
+    const filed = await api(
+      'POST',
+      '/leave-requests',
+      {
+        employeeId: staffEmployeeId,
+        type: 'CASUAL',
+        fromDate: future,
+        toDate: future,
+        reason: 'Wedding',
+      },
+      mgrToken,
+    );
+    await api('POST', `/leave-requests/${filed.body?.['id'] as string}/approve`, {}, mgrToken);
+
+    const day = await prisma.attendanceDay.findUniqueOrThrow({
+      where: {
+        employeeId_businessDate: {
+          employeeId: staffEmployeeId,
+          businessDate: new Date(`${future}T00:00:00.000Z`),
+        },
+      },
+    });
+    expect(day.status).toBe('ON_LEAVE');
+  });
+});

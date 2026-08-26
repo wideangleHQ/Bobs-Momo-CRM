@@ -243,8 +243,13 @@ export class WorkforceController {
     return this.leave.get(id, scope);
   }
 
+  // Decide first, so a manager filing on behalf of staff gets outlet scope and
+  // an employee falls through to the SELF grant and can only file their own.
+  // With the SELF key alone a manager who has no employee record of their own
+  // got a 403, which made the documented "manager files the sick leave the next
+  // morning" path impossible: it is the reason the backdate exception exists.
   @Post('leave-requests')
-  @Permissions('workforce.leave.request')
+  @Permissions('workforce.leave.decide', 'workforce.leave.request')
   @HttpCode(HttpStatus.CREATED)
   createLeave(
     @Body(new ZodValidationPipe(createLeaveSchema)) dto: CreateLeaveDto,

@@ -16,7 +16,7 @@ import { CurrentUser, Scope } from '../../common/decorators/current-user.decorat
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
-import { AnalyticsService } from './analytics.service';
+import { AnalyticsService, CONSUMPTION_TOP_N } from './analytics.service';
 
 @Controller('analytics')
 export class AnalyticsController {
@@ -45,7 +45,8 @@ export class AnalyticsController {
     @Query(new ZodValidationPipe(consumptionQuery)) query: ConsumptionQuery,
     @Scope() scope: RequestScope,
   ) {
-    return this.service.consumption(query, scope);
+    // The screen shows a top-N; the CSV export deliberately does not.
+    return this.service.consumption(query, scope, CONSUMPTION_TOP_N);
   }
 
   @Get('waste')

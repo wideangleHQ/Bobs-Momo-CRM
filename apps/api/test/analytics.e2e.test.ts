@@ -632,8 +632,11 @@ describe('csv export', () => {
     expect(lines.length).toBeGreaterThan(1);
     expect(lines.slice(1).every((l) => l.includes('BM-SAHEED'))).toBe(true);
     expect(text).not.toContain('BM-PATIA');
-    // Money reads the way a printed total reads in Bhubaneswar.
-    expect(lines.slice(1).some((l) => l.includes('"60,000.00"'))).toBe(true);
+    // Chapter 31: plain decimal, two places, no thousands separator, no
+    // currency symbol. Grouping put a comma inside the cell, toCsv quoted it,
+    // and Excel imported the column as text.
+    expect(lines.slice(1).some((l) => l.includes('60000.00'))).toBe(true);
+    expect(text).not.toContain('"60,000.00"');
   });
 
   test('a null order count is an empty cell, never a zero', async () => {
@@ -646,7 +649,8 @@ describe('csv export', () => {
       { headers: { authorization: `Bearer ${tokens[OPS] ?? ''}` } },
     );
     const line = (await res.text()).trim().split('\r\n')[1] ?? '';
-    expect(line).toContain('",,');
+    // order_count and avg_order_value are both empty, back to back.
+    expect(line).toContain(',,');
     expect(line).not.toContain(',0,');
   });
 

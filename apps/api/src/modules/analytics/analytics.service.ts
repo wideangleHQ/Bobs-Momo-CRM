@@ -7,7 +7,6 @@ import {
   GROSS_MARGIN_CAVEAT,
   GROSS_MARGIN_EXCLUDES,
   MAX_SPAN_DAYS,
-  formatIndianNumber,
   toBusinessDate,
   type ConsumptionQuery,
   type ExportQuery,
@@ -16,6 +15,7 @@ import {
   type WasteQuery,
 } from '@bobs-momo/shared';
 import { DomainError } from '../../common/errors/domain.error';
+import { lowStockWhere } from '../inventory/inventory.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
@@ -31,7 +31,7 @@ const ZERO = new Decimal(0);
 // corrects the count and a transfer moves stock rather than consuming it.
 const CONSUMPTION_TYPES = ['ISSUED', 'WASTAGE'] as const;
 
-const CONSUMPTION_TOP_N = 20;
+export const CONSUMPTION_TOP_N = 20;
 const DASHBOARD_TTL_SECONDS = 60;
 const DASHBOARD_SERIES_DAYS = 14;
 
@@ -152,7 +152,13 @@ export class AnalyticsService {
 
   // ---- 2. inventory consumption -----------------------------------------
 
-  async consumption(query: ConsumptionQuery, scope: RequestScope) {
+  /**
+   * `limit` is the screen's concern, not the data's. The CSV export used to
+   * reuse the screen's top-20 cut, so an owner exporting a month to reconcile
+   * against purchases got exactly twenty rows with nothing saying the rest had
+   * been dropped, and every reconciliation off that file was wrong.
+   */
+  async consumption(query: ConsumptionQuery, scope: RequestScope, limit?: number) {
     assertSpan(query.from, query.to, MAX_SPAN_DAYS.consumption);
 
     const types = query.type === 'ALL' ? [...CONSUMPTION_TYPES] : [query.type];
@@ -253,7 +259,7 @@ export class AnalyticsService {
     return {
       range: { from: query.from, to: query.to },
       type: query.type,
-      rows: all.slice(0, CONSUMPTION_TOP_N).map((r) => ({
+      rows: (limit === undefined ? all : all.slice(0, limit)).map((r) => ({
         ...r,
         issuedQty: r.issuedQty.toFixed(3),
         wastageQty: r.wastageQty.toFixed(3),
@@ -922,7 +928,10 @@ export class AnalyticsService {
         };
       }
       case 'consumption': {
-        const report = await this.consumption({ ...base, type: 'ALL', categoryId: query.categoryId }, scope);
+        const report = await this.consumption(
+          { ...base, type: 'ALL', categoryId: query.categoryId },
+          scope,
+        );
         const rows = 'rows' in report ? report.rows : [];
         return {
           headers: [
@@ -1051,17 +1060,18 @@ export class AnalyticsService {
   }
 
   private async lowStock(outletIds: string[]) {
-    const rows = await this.prisma.itemStock.findMany({
-      where: { outletId: { in: outletIds }, reorderLevel: { not: null }, item: { isActive: true } },
-      select: {
-        qtyOnHand: true,
-        reorderLevel: true,
-        outlet: { select: { code: true } },
+    // One definition of "below reorder", shared with the stock list and the
+    // daily digest. This used to load every stock row and compare in JS on the
+    // strength of a comment claiming Prisma could not express it, which the
+    // digest job disproved on the next screen over.
+    const below = await this.prisma.itemStock.findMany({
+      where: {
+        outletId: { in: outletIds },
+        item: { isActive: true },
+        ...lowStockWhere(this.prisma),
       },
+      select: { outlet: { select: { code: true } } },
     });
-    // The comparison is between two columns of the same row, which Prisma
-    // cannot express in a where clause.
-    const below = rows.filter((r) => r.reorderLevel !== null && r.qtyOnHand.lessThan(r.reorderLevel));
     const byOutlet: Record<string, number> = {};
     for (const row of below) {
       byOutlet[row.outlet.code] = (byOutlet[row.outlet.code] ?? 0) + 1;
@@ -1211,8 +1221,14 @@ function rate(value: number | null): string | null {
 }
 
 /** Rupees the way a printed total in Bhubaneswar reads. Empty stays empty. */
+/**
+ * A money cell in a CSV is a number, not a display string. Indian grouping put
+ * commas inside the cell, toCsv then quoted it, and Excel imported the whole
+ * column as text, so the owner could not sum the one column the export exists
+ * for. Grouping belongs on the screen; formatIndianNumber still serves it.
+ */
 function money(value: string | null): string | null {
-  return value === null ? null : formatIndianNumber(value);
+  return value;
 }
 
 function assertSpan(from: string, to: string, maxDays: number): void {

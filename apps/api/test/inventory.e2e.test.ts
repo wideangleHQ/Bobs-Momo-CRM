@@ -357,3 +357,32 @@ describe('outlet scope', () => {
     expect(rows.every((r) => r.outletId === outletId)).toBe(true);
   });
 });
+
+// belowReorder used to filter the page Prisma had already returned and report
+// the survivors as the total, so page one of the reorder list showed whichever
+// of the first 25 items alphabetically happened to be low and told the manager
+// that was all of them.
+describe('the reorder list is complete', () => {
+  test('belowReorder counts every low item, not just the ones on page one', async () => {
+    const rows = await prisma.itemStock.findMany({
+      where: { outletId, reorderLevel: { not: null }, item: { isActive: true } },
+      select: { qtyOnHand: true, reorderLevel: true },
+    });
+    const expected = rows.filter(
+      (r) => r.reorderLevel !== null && r.qtyOnHand.lessThan(r.reorderLevel),
+    ).length;
+
+    // A page size deliberately smaller than the catalogue.
+    const res = await api(
+      'GET',
+      `/inventory/stock?belowReorder=true&pageSize=5&outletId=${outletId}`,
+    );
+    expect(res.status).toBe(200);
+    const meta = res.body?.['meta'] as { total: number };
+    expect(meta.total).toBe(expected);
+
+    // And every row it did return really is below its level.
+    const data = res.body?.['data'] as { isBelowReorder: boolean }[];
+    expect(data.every((r) => r.isBelowReorder)).toBe(true);
+  });
+});

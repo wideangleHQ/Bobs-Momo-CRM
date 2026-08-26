@@ -152,6 +152,12 @@ export class InventoryService {
         ...(query.categoryId ? { categoryId: query.categoryId } : {}),
         ...(query.search ? { name: { contains: query.search, mode: 'insensitive' } } : {}),
       },
+      // The comparison runs in the database. It used to filter the page after
+      // Prisma had already paginated, and reported the survivors as the total:
+      // page one kept whichever of the first 25 items alphabetically happened
+      // to be low and told the manager that was the whole reorder list. He
+      // ordered three things and ran out of the rest.
+      ...(query.belowReorder ? lowStockWhere(this.prisma) : {}),
     };
     const [rows, total] = await this.repo.listStock(
       where,
@@ -159,10 +165,7 @@ export class InventoryService {
       query.pageSize,
     );
 
-    // belowReorder filters after the fact because the comparison is between two
-    // columns of the same row, which Prisma cannot express in a where clause.
-    const views = rows.map(toStockView).filter((r) => !query.belowReorder || r.isBelowReorder);
-    return paginate(views, query.belowReorder ? views.length : total, query);
+    return paginate(rows.map(toStockView), total, query);
   }
 
   async setReorderLevel(itemId: string, dto: SetReorderLevelDto, scope: RequestScope) {
@@ -416,6 +419,20 @@ function signedMovement(input: ApplyTransactionInput): Decimal {
   }
   const value = raw instanceof Decimal ? raw : new Decimal(raw.toFixed(3));
   return SIGN[input.type] === 0 ? value : value.abs().mul(SIGN[input.type]);
+}
+
+/**
+ * Below the reorder threshold, expressed once. The dashboard tile, the reorder
+ * list and the daily digest all ask the same question, and two of them used to
+ * answer it differently.
+ */
+export function lowStockWhere(prisma: PrismaService): Prisma.ItemStockWhereInput {
+  return {
+    reorderLevel: { not: null },
+    // Prisma's field-reference form, so the comparison happens in the database
+    // rather than over a page of rows that was already truncated.
+    qtyOnHand: { lt: prisma.itemStock.fields.reorderLevel },
+  };
 }
 
 function daysBetween(from: string, to: string): number {

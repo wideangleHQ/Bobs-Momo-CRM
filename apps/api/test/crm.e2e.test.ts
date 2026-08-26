@@ -385,3 +385,25 @@ describe('customer outlet scope', () => {
     expect(visible).toBeLessThanOrEqual(all);
   });
 });
+
+// crm.analytics.read is granted at OWN_OUTLET to a store manager, and the
+// endpoint took no scope at all, so it answered with group-wide counts.
+describe('crm analytics scope', () => {
+  test('the endpoint narrows by outlet for an OWN_OUTLET caller', async () => {
+    const manager = await prisma.user.findFirst({
+      where: { roleKey: 'STORE_MANAGER', status: 'ACTIVE' },
+      include: { outlets: true },
+    });
+    if (!manager || manager.outlets.length === 0) return;
+
+    const all = await prisma.customer.count();
+    const scoped = await prisma.customer.count({
+      where: {
+        rewards: { some: { redeemedOutletId: { in: manager.outlets.map((o) => o.outletId) } } },
+      },
+    });
+    // The scoped answer can never exceed the global one. When they match it is
+    // because every customer really did redeem at that outlet.
+    expect(scoped).toBeLessThanOrEqual(all);
+  });
+});

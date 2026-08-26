@@ -128,7 +128,7 @@ export class CrmController {
 
   @Get('analytics')
   @Permissions('crm.analytics.read')
-  analytics() {
-    return this.crm.analytics();
+  analytics(@Scope() scope: RequestScope) {
+    return this.crm.analytics(scope);
   }
 }

@@ -330,21 +330,34 @@ export class CrmService {
 
   // ---- analytics ---------------------------------------------------------
 
-  async analytics() {
+  async analytics(scope: RequestScope) {
+    // crm.analytics.read is granted at OWN_OUTLET to a store manager, so this
+    // has to narrow the same way listCustomers does. Without it the Patia
+    // manager reads group-wide customer counts, coins and coupon state.
+    const customerWhere = this.outletNarrowing(scope);
+    const playWhere = scope.allOutlets
+      ? {}
+      : { customer: { is: customerWhere } };
+    const rewardWhere = scope.allOutlets
+      ? {}
+      : { redeemedOutletId: { in: scope.outletIds } };
+
     // Counts, not money. A drifting snapshot across seven reads is invisible
     // on a dashboard and not worth holding a transaction open for.
     const [customers, verified, plays, coins, byStatus, byGame, games] = await Promise.all([
-      this.prisma.customer.count(),
-      this.prisma.customer.count({ where: { isGuest: false } }),
-      this.prisma.gamePlay.count(),
-      this.prisma.gamePlay.aggregate({ _sum: { coinsEarned: true } }),
+      this.prisma.customer.count({ where: customerWhere }),
+      this.prisma.customer.count({ where: { ...customerWhere, isGuest: false } }),
+      this.prisma.gamePlay.count({ where: playWhere }),
+      this.prisma.gamePlay.aggregate({ where: playWhere, _sum: { coinsEarned: true } }),
       this.prisma.rewardIssue.groupBy({
         by: ['status'],
+        where: rewardWhere,
         orderBy: { status: 'asc' },
         _count: { _all: true },
       }),
       this.prisma.gamePlay.groupBy({
         by: ['gameId'],
+        where: playWhere,
         orderBy: { gameId: 'asc' },
         _count: { _all: true },
         _sum: { coinsEarned: true },

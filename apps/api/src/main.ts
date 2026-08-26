@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { assertSecretsDiffer, corsOrigins, env } from './config/env';
@@ -10,10 +11,15 @@ async function bootstrap(): Promise<void> {
   assertSecretsDiffer();
   process.env.TZ = cfg.TZ;
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: cfg.NODE_ENV === 'production' ? ['log', 'warn', 'error'] : ['debug', 'log', 'warn', 'error'],
   });
 
+  // One proxy hop, so req.ip is the client rather than Railway's load balancer.
+  // Without this the public game rate limiter keys every visitor on the same
+  // address and 20 requests a minute becomes one bucket for the whole internet.
+  // Not `true`: that would trust a spoofed X-Forwarded-For end to end.
+  app.set('trust proxy', 1);
   app.setGlobalPrefix(cfg.API_PREFIX);
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors({ origin: corsOrigins(), credentials: true });

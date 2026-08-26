@@ -1,0 +1,912 @@
+// Bob's Momo ERP & CRM - single source of database truth.
+// See book chapter 10 (data model) for the field-by-field rationale.
+// Money is Decimal(14,2). Quantity is Decimal(14,3). Float is banned.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── enums ────────────────────────────────────────────────────────────────
+
+enum RoleKey {
+  OWNER
+  OPERATIONS_MANAGER
+  STORE_MANAGER
+  KITCHEN_MANAGER
+  INVENTORY_MANAGER
+  PURCHASE_MANAGER
+  HR_ACCOUNTS
+  KITCHEN_STAFF
+  COUNTER_CASHIER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DISABLED
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_NOTICE
+  EXITED
+}
+
+enum StockTxnType {
+  OPENING
+  RECEIVED
+  ISSUED
+  WASTAGE
+  ADJUSTMENT
+  TRANSFER_OUT
+  TRANSFER_IN
+  CLOSING
+}
+
+enum PurchaseRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  FULFILLED
+}
+
+enum PurchaseStatus {
+  DRAFT
+  RECORDED
+  VOIDED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  ON_LEAVE
+  WEEKLY_OFF
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  SWAPPED
+  CANCELLED
+}
+
+enum LeaveType {
+  CASUAL
+  SICK
+  UNPAID
+  COMP_OFF
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum TaskKind {
+  ONE_OFF
+  RECURRING_INSTANCE
+  CHECKLIST_RUN
+  AUDIT_RUN
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  VERIFIED
+  CANCELLED
+  OVERDUE
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ChecklistItemResult {
+  PASS
+  FAIL
+  NA
+}
+
+enum NotificationChannel {
+  IN_APP
+  WHATSAPP
+  EMAIL
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  SUPPRESSED
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DONE
+  DEAD
+}
+
+enum MessageScope {
+  DIRECT
+  OUTLET
+  DEPARTMENT
+  ALL
+}
+
+enum RewardStatus {
+  ISSUED
+  REDEEMED
+  EXPIRED
+  VOIDED
+}
+
+// ── identity and org ─────────────────────────────────────────────────────
+
+model Outlet {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique // "BM-SAHEED", "BM-PATIA"
+  name      String
+  address   String?
+  timezone  String   @default("Asia/Kolkata")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departments  Department[]
+  employees    Employee[]
+  itemStocks   ItemStock[]
+  stockTxns    StockTransaction[]
+  purchaseReqs PurchaseRequest[]
+  purchases    Purchase[]
+  tasks        Task[]
+  shifts       Shift[]
+  salesEntries DailySalesEntry[]
+  userOutlets  UserOutlet[]
+}
+
+model Department {
+  id       String  @id @default(uuid()) @db.Uuid
+  outletId String  @db.Uuid
+  name     String // Kitchen, Counter, Store, Admin
+  isActive Boolean @default(true)
+
+  outlet    Outlet     @relation(fields: [outletId], references: [id])
+  employees Employee[]
+
+  @@unique([outletId, name])
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String?    @unique
+  username     String     @unique
+  passwordHash String
+  status       UserStatus @default(ACTIVE)
+  roleKey      RoleKey
+  mustReset    Boolean    @default(true)
+  failedLogins Int        @default(0)
+  lockedUntil  DateTime?
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  employee      Employee?
+  outlets       UserOutlet[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+  notifications Notification[]
+
+  @@index([roleKey, status])
+}
+
+// A user may be scoped to one or many outlets. OWNER and OPERATIONS_MANAGER
+// get every active outlet at login time instead of rows here.
+model UserOutlet {
+  userId   String @db.Uuid
+  outletId String @db.Uuid
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outlet Outlet @relation(fields: [outletId], references: [id])
+
+  @@id([userId, outletId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique // sha256 of the opaque token
+  familyId  String    @db.Uuid // rotation family, for reuse detection
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Employee {
+  id           String           @id @default(uuid()) @db.Uuid
+  userId       String?          @unique @db.Uuid
+  employeeCode String           @unique // "BM-EMP-0007"
+  fullName     String
+  phone        String
+  outletId     String           @db.Uuid
+  departmentId String?          @db.Uuid
+  designation  String?
+  joinedOn     DateTime         @db.Date
+  exitedOn     DateTime?        @db.Date
+  status       EmploymentStatus @default(ACTIVE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user        User?           @relation(fields: [userId], references: [id])
+  outlet      Outlet          @relation(fields: [outletId], references: [id])
+  department  Department?     @relation(fields: [departmentId], references: [id])
+  attendance  AttendanceDay[]
+  shifts      Shift[]
+  leaves      LeaveRequest[]
+  salary      SalaryRecord[]
+  tasks       Task[]          @relation("TaskAssignee")
+  createdTask Task[]          @relation("TaskCreator")
+
+  @@index([outletId, status])
+}
+
+// ── inventory ────────────────────────────────────────────────────────────
+
+model Unit {
+  id    String          @id @default(uuid()) @db.Uuid
+  code  String          @unique // KG, G, L, ML, PCS, PKT
+  name  String
+  items InventoryItem[]
+}
+
+model ItemCategory {
+  id    String          @id @default(uuid()) @db.Uuid
+  name  String          @unique // Vegetables, Meat, Packaging, Sauces, Beverages
+  items InventoryItem[]
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  sku          String   @unique // "ITM-CHICKEN-MINCE"
+  name         String
+  categoryId   String   @db.Uuid
+  unitId       String   @db.Uuid
+  isPerishable Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  category      ItemCategory          @relation(fields: [categoryId], references: [id])
+  unit          Unit                  @relation(fields: [unitId], references: [id])
+  stocks        ItemStock[]
+  transactions  StockTransaction[]
+  priceHistory  ItemPriceHistory[]
+  requestLines  PurchaseRequestLine[]
+  purchaseLines PurchaseItem[]
+  vendorLinks   VendorItem[]
+
+  @@index([categoryId, isActive])
+}
+
+// Per outlet running balance and reorder threshold. One row per (item, outlet).
+model ItemStock {
+  id           String    @id @default(uuid()) @db.Uuid
+  itemId       String    @db.Uuid
+  outletId     String    @db.Uuid
+  qtyOnHand    Decimal   @default(0) @db.Decimal(14, 3)
+  reorderLevel Decimal?  @db.Decimal(14, 3)
+  lastAlertAt  DateTime?
+  updatedAt    DateTime  @updatedAt
+
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+  outlet Outlet        @relation(fields: [outletId], references: [id])
+
+  @@unique([itemId, outletId])
+  @@index([outletId])
+}
+
+// Append-only ledger. Never UPDATE a row. Corrections are new ADJUSTMENT rows.
+model StockTransaction {
+  id             String       @id @default(uuid()) @db.Uuid
+  itemId         String       @db.Uuid
+  outletId       String       @db.Uuid
+  type           StockTxnType
+  quantity       Decimal      @db.Decimal(14, 3) // always positive
+  signedQty      Decimal      @db.Decimal(14, 3) // + or - after sign rules
+  balanceAfter   Decimal      @db.Decimal(14, 3)
+  businessDate   DateTime     @db.Date
+  reason         String? // required for WASTAGE, ADJUSTMENT
+  note           String?
+  sourceType     String? // "PURCHASE", "TRANSFER", "MANUAL"
+  sourceId       String?      @db.Uuid
+  transferPairId String?      @db.Uuid // links TRANSFER_OUT to TRANSFER_IN
+  createdById    String       @db.Uuid
+  createdAt      DateTime     @default(now())
+
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+  outlet Outlet        @relation(fields: [outletId], references: [id])
+
+  @@index([outletId, businessDate])
+  @@index([itemId, outletId, createdAt])
+}
+
+// ── purchase and vendor ──────────────────────────────────────────────────
+
+model Vendor {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  gstin     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items        VendorItem[]
+  purchases    Purchase[]
+  priceHistory ItemPriceHistory[]
+
+  @@unique([name])
+}
+
+model VendorItem {
+  vendorId String @db.Uuid
+  itemId   String @db.Uuid
+
+  vendor Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@id([vendorId, itemId])
+}
+
+model PurchaseRequest {
+  id            String                @id @default(uuid()) @db.Uuid
+  requestNo     String                @unique // "PR-2026-0042"
+  outletId      String                @db.Uuid
+  status        PurchaseRequestStatus @default(PENDING)
+  neededBy      DateTime?             @db.Date
+  note          String?
+  requestedById String                @db.Uuid
+  decidedById   String?               @db.Uuid
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  outlet Outlet                @relation(fields: [outletId], references: [id])
+  lines  PurchaseRequestLine[]
+
+  @@index([outletId, status])
+}
+
+model PurchaseRequestLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  requestId String  @db.Uuid
+  itemId    String  @db.Uuid
+  quantity  Decimal @db.Decimal(14, 3)
+  note      String?
+
+  request PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  item    InventoryItem   @relation(fields: [itemId], references: [id])
+}
+
+model Purchase {
+  id           String         @id @default(uuid()) @db.Uuid
+  purchaseNo   String         @unique // "PO-2026-0117"
+  outletId     String         @db.Uuid
+  vendorId     String         @db.Uuid
+  requestId    String?        @db.Uuid
+  status       PurchaseStatus @default(DRAFT)
+  invoiceNo    String?
+  purchaseDate DateTime       @db.Date
+  subtotal     Decimal        @default(0) @db.Decimal(14, 2)
+  taxAmount    Decimal        @default(0) @db.Decimal(14, 2)
+  totalAmount  Decimal        @default(0) @db.Decimal(14, 2)
+  recordedById String         @db.Uuid
+  voidedAt     DateTime?
+  voidReason   String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  outlet Outlet         @relation(fields: [outletId], references: [id])
+  vendor Vendor         @relation(fields: [vendorId], references: [id])
+  items  PurchaseItem[]
+
+  @@index([outletId, purchaseDate])
+  @@index([vendorId, purchaseDate])
+}
+
+model PurchaseItem {
+  id         String  @id @default(uuid()) @db.Uuid
+  purchaseId String  @db.Uuid
+  itemId     String  @db.Uuid
+  quantity   Decimal @db.Decimal(14, 3)
+  unitPrice  Decimal @db.Decimal(14, 2)
+  lineTotal  Decimal @db.Decimal(14, 2)
+
+  purchase Purchase      @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  item     InventoryItem @relation(fields: [itemId], references: [id])
+
+  @@index([itemId])
+}
+
+// One row per item per vendor per purchase. Powers the price fluctuation chart.
+model ItemPriceHistory {
+  id         String   @id @default(uuid()) @db.Uuid
+  itemId     String   @db.Uuid
+  vendorId   String   @db.Uuid
+  unitPrice  Decimal  @db.Decimal(14, 2)
+  observedOn DateTime @db.Date
+  purchaseId String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  item   InventoryItem @relation(fields: [itemId], references: [id])
+  vendor Vendor        @relation(fields: [vendorId], references: [id])
+
+  @@index([itemId, observedOn])
+}
+
+// ── workforce ────────────────────────────────────────────────────────────
+
+model Shift {
+  id          String      @id @default(uuid()) @db.Uuid
+  employeeId  String      @db.Uuid
+  outletId    String      @db.Uuid
+  shiftDate   DateTime    @db.Date
+  startsAt    DateTime
+  endsAt      DateTime
+  status      ShiftStatus @default(SCHEDULED)
+  note        String?
+  createdById String      @db.Uuid
+  createdAt   DateTime    @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  outlet   Outlet   @relation(fields: [outletId], references: [id])
+
+  @@unique([employeeId, shiftDate, startsAt])
+  @@index([outletId, shiftDate])
+}
+
+// One row per employee per calendar day. Punches hang off it.
+model AttendanceDay {
+  id           String           @id @default(uuid()) @db.Uuid
+  employeeId   String           @db.Uuid
+  outletId     String           @db.Uuid
+  businessDate DateTime         @db.Date
+  status       AttendanceStatus @default(ABSENT)
+  firstInAt    DateTime?
+  lastOutAt    DateTime?
+  workedMins   Int              @default(0)
+  breakMins    Int              @default(0)
+  lateMins     Int              @default(0)
+  note         String?
+  updatedAt    DateTime         @updatedAt
+
+  employee Employee          @relation(fields: [employeeId], references: [id])
+  punches  AttendancePunch[]
+  breaks   BreakLog[]
+
+  @@unique([employeeId, businessDate])
+  @@index([outletId, businessDate])
+}
+
+model AttendancePunch {
+  id              String   @id @default(uuid()) @db.Uuid
+  attendanceDayId String   @db.Uuid
+  direction       String // "IN" | "OUT"
+  punchedAt       DateTime
+  source          String   @default("WEB") // WEB | MANAGER_EDIT
+  editedById      String?  @db.Uuid
+  editReason      String?
+  createdAt       DateTime @default(now())
+
+  day AttendanceDay @relation(fields: [attendanceDayId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceDayId, punchedAt])
+}
+
+model BreakLog {
+  id              String    @id @default(uuid()) @db.Uuid
+  attendanceDayId String    @db.Uuid
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationMins    Int?
+  reason          String?
+
+  day AttendanceDay @relation(fields: [attendanceDayId], references: [id], onDelete: Cascade)
+
+  @@index([attendanceDayId])
+}
+
+model LeaveRequest {
+  id           String      @id @default(uuid()) @db.Uuid
+  employeeId   String      @db.Uuid
+  type         LeaveType
+  fromDate     DateTime    @db.Date
+  toDate       DateTime    @db.Date
+  dayCount     Decimal     @db.Decimal(4, 1)
+  reason       String
+  status       LeaveStatus @default(PENDING)
+  decidedById  String?     @db.Uuid
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, status])
+  @@index([status, fromDate])
+}
+
+// Storage only in Phase 1. No payroll computation. See ADR-006.
+model SalaryRecord {
+  id            String    @id @default(uuid()) @db.Uuid
+  employeeId    String    @db.Uuid
+  effectiveFrom DateTime  @db.Date
+  effectiveTo   DateTime? @db.Date
+  monthlyCtc    Decimal   @db.Decimal(12, 2)
+  basic         Decimal?  @db.Decimal(12, 2)
+  allowances    Decimal?  @db.Decimal(12, 2)
+  note          String?
+  createdById   String    @db.Uuid
+  createdAt     DateTime  @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, effectiveFrom])
+}
+
+// ── task engine (also powers checklists, SOPs and audits) ────────────────
+
+model ChecklistTemplate {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique // "KITCHEN_OPEN", "CLOSING", "CLEANING"
+  name        String
+  description String?
+  isAudit     Boolean  @default(false)
+  outletId    String?  @db.Uuid // null = applies to all outlets
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  items      ChecklistTemplateItem[]
+  recurrence TaskRecurrence[]
+  tasks      Task[]
+}
+
+model ChecklistTemplateItem {
+  id              String  @id @default(uuid()) @db.Uuid
+  templateId      String  @db.Uuid
+  sortOrder       Int
+  label           String
+  requiresPhoto   Boolean @default(false)
+  requiresNote    Boolean @default(false)
+  failCreatesTask Boolean @default(false)
+
+  template ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, sortOrder])
+}
+
+model TaskRecurrence {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String
+  cronExpr     String // "0 7 * * *" evaluated in Asia/Kolkata
+  templateId   String?      @db.Uuid
+  title        String?
+  outletId     String?      @db.Uuid
+  departmentId String?      @db.Uuid
+  assigneeId   String?      @db.Uuid
+  priority     TaskPriority @default(NORMAL)
+  dueAfterMins Int          @default(120)
+  isActive     Boolean      @default(true)
+  lastRunAt    DateTime?
+  createdAt    DateTime     @default(now())
+
+  template ChecklistTemplate? @relation(fields: [templateId], references: [id])
+  tasks    Task[]
+}
+
+model Task {
+  id                   String       @id @default(uuid()) @db.Uuid
+  kind                 TaskKind
+  title                String
+  description          String?
+  outletId             String       @db.Uuid
+  departmentId         String?      @db.Uuid
+  assigneeId           String?      @db.Uuid
+  createdById          String       @db.Uuid
+  templateId           String?      @db.Uuid
+  recurrenceId         String?      @db.Uuid
+  parentTaskId         String?      @db.Uuid // follow-up task from a failed audit item
+  priority             TaskPriority @default(NORMAL)
+  status               TaskStatus   @default(OPEN)
+  dueAt                DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  verifiedAt           DateTime?
+  verifiedById         String?      @db.Uuid
+  requiresVerification Boolean      @default(false)
+  overdueNotifiedAt    DateTime?
+  businessDate         DateTime     @db.Date
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  outlet      Outlet                @relation(fields: [outletId], references: [id])
+  assignee    Employee?             @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creator     Employee              @relation("TaskCreator", fields: [createdById], references: [id])
+  template    ChecklistTemplate?    @relation(fields: [templateId], references: [id])
+  recurrence  TaskRecurrence?       @relation(fields: [recurrenceId], references: [id])
+  results     TaskChecklistResult[]
+  comments    TaskComment[]
+  attachments TaskAttachment[]
+
+  @@index([outletId, status, dueAt])
+  @@index([assigneeId, status])
+  @@index([status, dueAt]) // drives the overdue sweep
+}
+
+model TaskChecklistResult {
+  id             String              @id @default(uuid()) @db.Uuid
+  taskId         String              @db.Uuid
+  templateItemId String              @db.Uuid
+  result         ChecklistItemResult
+  note           String?
+  attachmentId   String?             @db.Uuid
+  recordedAt     DateTime            @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, templateItemId])
+}
+
+model TaskComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  authorId  String   @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+}
+
+model TaskAttachment {
+  id           String   @id @default(uuid()) @db.Uuid
+  taskId       String   @db.Uuid
+  storageKey   String // Supabase Storage object key
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+// ── sales (manual entry, no POS in Phase 1) ──────────────────────────────
+
+model DailySalesEntry {
+  id           String    @id @default(uuid()) @db.Uuid
+  outletId     String    @db.Uuid
+  businessDate DateTime  @db.Date
+  grossSales   Decimal   @db.Decimal(14, 2)
+  discounts    Decimal   @default(0) @db.Decimal(14, 2)
+  netSales     Decimal   @db.Decimal(14, 2)
+  orderCount   Int?
+  cashAmount   Decimal   @default(0) @db.Decimal(14, 2)
+  upiAmount    Decimal   @default(0) @db.Decimal(14, 2)
+  cardAmount   Decimal   @default(0) @db.Decimal(14, 2)
+  otherAmount  Decimal   @default(0) @db.Decimal(14, 2)
+  note         String?
+  enteredById  String    @db.Uuid
+  lockedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  outlet Outlet @relation(fields: [outletId], references: [id])
+
+  @@unique([outletId, businessDate])
+  @@index([businessDate])
+}
+
+// ── notification, outbox, chat ───────────────────────────────────────────
+
+// Transactional outbox. Written inside the same tx as the business change.
+model OutboxEvent {
+  id            String       @id @default(uuid()) @db.Uuid
+  eventKey      String // see section 8, e.g. "LOW_STOCK"
+  aggregateType String
+  aggregateId   String       @db.Uuid
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?
+  availableAt   DateTime     @default(now())
+  processedAt   DateTime?
+  createdAt     DateTime     @default(now())
+
+  @@index([status, availableAt])
+}
+
+model Notification {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @db.Uuid
+  eventKey    String
+  channel     NotificationChannel
+  status      NotificationStatus  @default(QUEUED)
+  title       String
+  body        String
+  deepLink    String?
+  payload     Json?
+  providerRef String? // WhatsApp message id
+  failReason  String?
+  readAt      DateTime?
+  sentAt      DateTime?
+  createdAt   DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([status, channel])
+}
+
+model NotificationPreference {
+  id       String              @id @default(uuid()) @db.Uuid
+  userId   String              @db.Uuid
+  eventKey String
+  channel  NotificationChannel
+  enabled  Boolean             @default(true)
+
+  @@unique([userId, eventKey, channel])
+}
+
+model Message {
+  id           String       @id @default(uuid()) @db.Uuid
+  scope        MessageScope
+  senderId     String       @db.Uuid
+  recipientId  String?      @db.Uuid // DIRECT only
+  outletId     String?      @db.Uuid // OUTLET only
+  departmentId String?      @db.Uuid // DEPARTMENT only
+  body         String
+  isPinned     Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  reads MessageRead[]
+
+  @@index([scope, outletId, createdAt])
+  @@index([recipientId, createdAt])
+}
+
+model MessageRead {
+  messageId String   @db.Uuid
+  userId    String   @db.Uuid
+  readAt    DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+}
+
+// ── customer CRM and game layer (see ch32 for the SRS gap note) ──────────
+
+model Customer {
+  id          String    @id @default(uuid()) @db.Uuid
+  phone       String    @unique
+  name        String?
+  isGuest     Boolean   @default(false)
+  coinBalance Int       @default(0)
+  consentAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  gamePlays GamePlay[]
+  rewards   RewardIssue[]
+}
+
+model GameConfig {
+  id          String    @id @default(uuid()) @db.Uuid
+  slug        String    @unique
+  name        String
+  rulesJson   Json
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  plays   GamePlay[]
+  rewards RewardDefinition[]
+}
+
+model GamePlay {
+  id          String   @id @default(uuid()) @db.Uuid
+  gameId      String   @db.Uuid
+  customerId  String?  @db.Uuid
+  sessionKey  String // anonymous play tracking
+  score       Int
+  coinsEarned Int      @default(0)
+  ipHash      String?
+  playedAt    DateTime @default(now())
+
+  game     GameConfig @relation(fields: [gameId], references: [id])
+  customer Customer?  @relation(fields: [customerId], references: [id])
+
+  @@index([gameId, playedAt])
+  @@index([customerId, playedAt])
+}
+
+model RewardDefinition {
+  id          String  @id @default(uuid()) @db.Uuid
+  gameId      String? @db.Uuid
+  code        String  @unique
+  name        String
+  coinCost    Int
+  description String?
+  isActive    Boolean @default(true)
+
+  game   GameConfig?   @relation(fields: [gameId], references: [id])
+  issues RewardIssue[]
+}
+
+model RewardIssue {
+  id               String       @id @default(uuid()) @db.Uuid
+  customerId       String       @db.Uuid
+  definitionId     String       @db.Uuid
+  couponCode       String       @unique
+  status           RewardStatus @default(ISSUED)
+  expiresAt        DateTime?
+  redeemedAt       DateTime?
+  redeemedOutletId String?      @db.Uuid
+  redeemedById     String?      @db.Uuid
+  createdAt        DateTime     @default(now())
+
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  definition RewardDefinition @relation(fields: [definitionId], references: [id])
+
+  @@index([customerId, status])
+}
+
+// ── audit ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  actorLabel String // denormalised, survives user deletion
+  action     String // "inventory.stock.adjust"
+  entityType String
+  entityId   String?  @db.Uuid
+  outletId   String?  @db.Uuid
+  before     Json?
+  after      Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId, createdAt])
+  @@index([outletId, createdAt])
+  @@index([actorId, createdAt])
+}

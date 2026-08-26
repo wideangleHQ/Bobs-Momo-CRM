@@ -44,6 +44,24 @@ const BACKDATE_LIMIT_DAYS = 7;
 const LOW_STOCK_COOLDOWN_HOURS = 12;
 const MAX_RANGE_DAYS = 92;
 
+/**
+ * What a caller inside an outer transaction hands to applyTransaction. Purchase
+ * uses this for RECEIVED lines and for the compensating rows on a void.
+ */
+export interface ApplyTransactionInput {
+  itemId: string;
+  outletId: string;
+  type: StockTxnType;
+  quantity?: number | Prisma.Decimal;
+  signedQty?: number | Prisma.Decimal;
+  businessDate: string;
+  reason?: string | null;
+  note?: string | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  transferPairId?: string | null;
+}
+
 export interface RecordedTransaction {
   id: string;
   itemId: string;
@@ -210,94 +228,105 @@ export class InventoryService {
     scope: RequestScope,
   ): Promise<RecordedTransaction> {
     if (!scope.outletIds.includes(dto.outletId)) throw DomainError.notFound();
+    return this.prisma.$transaction((tx) => this.applyTransaction(tx, dto, user.sub));
+  }
 
-    const item = await this.repo.findItem(dto.itemId);
+  /**
+   * The single place a stock balance moves. Purchase calls this with its own
+   * transaction client so the receipt, the ledger rows and the balance either
+   * all commit or none do. Duplicating any of it would mean two code paths
+   * computing balanceAfter differently, and the ledger would stop replaying to
+   * the balance.
+   */
+  async applyTransaction(
+    tx: Prisma.TransactionClient,
+    input: ApplyTransactionInput,
+    actorId: string,
+  ): Promise<RecordedTransaction> {
+    const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId } });
     if (!item) throw this.itemNotFound();
     if (!item.isActive) {
       throw new DomainError(
         HttpStatus.UNPROCESSABLE_ENTITY,
         ERROR_CODES.INVENTORY_ITEM_INACTIVE,
-        'That item is no longer in use',
+        `${item.name} is no longer in use`,
       );
     }
 
-    this.assertBusinessDate(dto.businessDate, dto.type);
+    this.assertBusinessDate(input.businessDate, input.type);
 
-    return this.prisma.$transaction(async (tx) => {
-      const stock = await this.repo.lockStock(tx, dto.itemId, dto.outletId);
-      const businessDate = new Date(`${dto.businessDate}T00:00:00.000Z`);
+    const stock = await this.repo.lockStock(tx, input.itemId, input.outletId);
+    const businessDate = new Date(`${input.businessDate}T00:00:00.000Z`);
 
-      if (dto.type === 'OPENING') {
-        const already = await this.repo.countOpeningOnDate(
-          tx,
-          dto.itemId,
-          dto.outletId,
-          businessDate,
-        );
-        if (already > 0) {
-          throw DomainError.conflict(
-            ERROR_CODES.INVENTORY_OPENING_ALREADY_RECORDED,
-            'Opening stock for this item is already recorded for that day',
-          );
-        }
-      }
-
-      const before = new Decimal(stock.qtyOnHand);
-      const signed =
-        dto.type === 'ADJUSTMENT'
-          ? new Decimal((dto.signedQty as number).toFixed(3))
-          : new Decimal((dto.quantity as number).toFixed(3)).mul(SIGN[dto.type]);
-      const after = before.plus(signed);
-
-      if (REASON_REQUIRED.includes(dto.type) && !dto.reason?.trim()) {
-        throw DomainError.badRequest(
-          ERROR_CODES.INVENTORY_REASON_REQUIRED,
-          'A reason is required for this type',
-        );
-      }
-      if (after.lt(0) && NEGATIVE_BLOCKED.includes(dto.type)) {
-        throw new DomainError(
-          HttpStatus.UNPROCESSABLE_ENTITY,
-          ERROR_CODES.INVENTORY_NEGATIVE_STOCK_BLOCKED,
-          `Only ${before.toFixed(3)} on hand`,
-          { onHand: before.toFixed(3), requested: signed.abs().toFixed(3) },
-        );
-      }
-
-      const row = await this.repo.createTransaction(tx, {
-        itemId: dto.itemId,
-        outletId: dto.outletId,
-        type: dto.type,
-        quantity: signed.abs(),
-        signedQty: signed,
-        balanceAfter: after,
+    if (input.type === 'OPENING') {
+      const already = await this.repo.countOpeningOnDate(
+        tx,
+        input.itemId,
+        input.outletId,
         businessDate,
-        reason: dto.reason ?? null,
-        note: dto.note ?? null,
-        sourceType: 'MANUAL',
-        createdById: user.sub,
-      });
+      );
+      if (already > 0) {
+        throw DomainError.conflict(
+          ERROR_CODES.INVENTORY_OPENING_ALREADY_RECORDED,
+          'Opening stock for this item is already recorded for that day',
+        );
+      }
+    }
 
-      await this.repo.setBalance(tx, stock.id, after);
-      const lowStockRaised = await this.maybeRaiseLowStock(tx, stock, before, after);
+    const before = new Decimal(stock.qtyOnHand);
+    const signed = signedMovement(input);
+    const after = before.plus(signed);
 
-      return {
-        id: row.id,
-        itemId: row.itemId,
-        outletId: row.outletId,
-        type: row.type,
-        quantity: row.quantity.toFixed(3),
-        signedQty: row.signedQty.toFixed(3),
-        balanceAfter: row.balanceAfter.toFixed(3),
-        businessDate: dto.businessDate,
-        reason: row.reason,
-        note: row.note,
-        sourceType: row.sourceType,
-        createdById: row.createdById,
-        createdAt: row.createdAt.toISOString(),
-        lowStockRaised,
-      };
+    if (REASON_REQUIRED.includes(input.type) && !input.reason?.trim()) {
+      throw DomainError.badRequest(
+        ERROR_CODES.INVENTORY_REASON_REQUIRED,
+        'A reason is required for this type',
+      );
+    }
+    if (after.lt(0) && NEGATIVE_BLOCKED.includes(input.type)) {
+      throw new DomainError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        ERROR_CODES.INVENTORY_NEGATIVE_STOCK_BLOCKED,
+        `Only ${before.toFixed(3)} of ${item.name} on hand`,
+        { onHand: before.toFixed(3), requested: signed.abs().toFixed(3) },
+      );
+    }
+
+    const row = await this.repo.createTransaction(tx, {
+      itemId: input.itemId,
+      outletId: input.outletId,
+      type: input.type,
+      quantity: signed.abs(),
+      signedQty: signed,
+      balanceAfter: after,
+      businessDate,
+      reason: input.reason ?? null,
+      note: input.note ?? null,
+      sourceType: input.sourceType ?? 'MANUAL',
+      sourceId: input.sourceId ?? null,
+      transferPairId: input.transferPairId ?? null,
+      createdById: actorId,
     });
+
+    await this.repo.setBalance(tx, stock.id, after);
+    const lowStockRaised = await this.maybeRaiseLowStock(tx, stock, before, after);
+
+    return {
+      id: row.id,
+      itemId: row.itemId,
+      outletId: row.outletId,
+      type: row.type,
+      quantity: row.quantity.toFixed(3),
+      signedQty: row.signedQty.toFixed(3),
+      balanceAfter: row.balanceAfter.toFixed(3),
+      businessDate: input.businessDate,
+      reason: row.reason,
+      note: row.note,
+      sourceType: row.sourceType,
+      createdById: row.createdById,
+      createdAt: row.createdAt.toISOString(),
+      lowStockRaised,
+    };
   }
 
   /**
@@ -372,6 +401,21 @@ export class InventoryService {
       'That item does not exist',
     );
   }
+}
+
+/** ADJUSTMENT and CLOSING carry their own sign. Everything else gets it from type. */
+function signedMovement(input: ApplyTransactionInput): Decimal {
+  const raw = SIGN[input.type] === 0 ? input.signedQty : input.quantity;
+  if (raw === undefined) {
+    throw DomainError.badRequest(
+      ERROR_CODES.COMMON_VALIDATION_FAILED,
+      SIGN[input.type] === 0
+        ? 'This type needs a signed quantity'
+        : 'This type needs a quantity',
+    );
+  }
+  const value = raw instanceof Decimal ? raw : new Decimal(raw.toFixed(3));
+  return SIGN[input.type] === 0 ? value : value.abs().mul(SIGN[input.type]);
 }
 
 function daysBetween(from: string, to: string): number {

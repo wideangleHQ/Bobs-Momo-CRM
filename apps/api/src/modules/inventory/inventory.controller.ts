@@ -72,6 +72,7 @@ export class InventoryController {
   }
 
   @Post('items/:id/deactivate')
+  @HttpCode(HttpStatus.OK)
   @Permissions('inventory.item.deactivate')
   deactivateItem(@Param('id', ParseUUIDPipe) id: string) {
     return this.service.deactivateItem(id);

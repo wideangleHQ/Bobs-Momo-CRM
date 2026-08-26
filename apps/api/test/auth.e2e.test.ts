@@ -243,3 +243,65 @@ function errorCode(res: { body: Record<string, unknown> | null }): string | unde
   const err = res.body?.['error'] as { code?: string } | undefined;
   return err?.code;
 }
+
+// A lock used to be pushed forward on every wrong password, so a cook who kept
+// mistyping locked himself out permanently and anyone who knew a username could
+// hold an account shut with one request every fifteen minutes.
+describe('lockout does not renew itself', () => {
+  test('further wrong attempts do not extend an active lock', async () => {
+    const username = 'e2e.lockrenew';
+    await prisma.user.deleteMany({ where: { username } });
+    const passwords = app.get(PasswordService);
+    await prisma.user.create({
+      data: {
+        username,
+        passwordHash: await passwords.hash(PASSWORD),
+        roleKey: 'KITCHEN_STAFF',
+        mustReset: false,
+      },
+    });
+
+    for (let i = 0; i < 5; i++) {
+      await post('/auth/login', { identifier: username, password: 'wrong' });
+    }
+    const locked = await prisma.user.findUniqueOrThrow({ where: { username } });
+    expect(locked.lockedUntil).not.toBeNull();
+    const firstLock = locked.lockedUntil!.getTime();
+
+    await Bun.sleep(20);
+    await post('/auth/login', { identifier: username, password: 'wrong' });
+    await post('/auth/login', { identifier: username, password: 'wrong' });
+
+    const after = await prisma.user.findUniqueOrThrow({ where: { username } });
+    expect(after.lockedUntil!.getTime()).toBe(firstLock);
+    // The counter does not keep climbing either.
+    expect(after.failedLogins).toBe(5);
+
+    await prisma.user.deleteMany({ where: { username } });
+  });
+
+  test('a stale counter restarts rather than accumulating', async () => {
+    const username = 'e2e.lockstale';
+    await prisma.user.deleteMany({ where: { username } });
+    const passwords = app.get(PasswordService);
+    await prisma.user.create({
+      data: {
+        username,
+        passwordHash: await passwords.hash(PASSWORD),
+        roleKey: 'KITCHEN_STAFF',
+        mustReset: false,
+        // Four old failures and a lock that expired long ago.
+        failedLogins: 4,
+        lockedUntil: new Date(Date.now() - 60 * 60 * 1000),
+      },
+    });
+
+    await post('/auth/login', { identifier: username, password: 'wrong' });
+    const after = await prisma.user.findUniqueOrThrow({ where: { username } });
+    // Five typos spread over a month must not add up to a lockout.
+    expect(after.failedLogins).toBe(1);
+    expect(after.lockedUntil).toBeNull();
+
+    await prisma.user.deleteMany({ where: { username } });
+  });
+});

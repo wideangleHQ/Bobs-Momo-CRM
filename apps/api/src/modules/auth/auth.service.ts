@@ -316,12 +316,31 @@ export class AuthService {
     };
   }
 
+  /**
+   * A lock is set once, on the attempt that crosses the threshold, and is never
+   * pushed forward by later attempts.
+   *
+   * Renewing it on every failure meant a cook who kept mistyping locked himself
+   * out permanently: he cannot see the lock, because a wrong password returns
+   * the same 401 as always, so he keeps trying and keeps resetting the clock.
+   * It also let anyone who knows a username hold that account shut with one
+   * request every fifteen minutes.
+   *
+   * The counter is also allowed to go stale. Once the window has passed with no
+   * further attempts the count restarts, so five typos spread over a month do
+   * not add up to a lockout.
+   */
   private async registerFailure(user: User): Promise<void> {
-    const failedLogins = user.failedLogins + 1;
+    const now = Date.now();
+    const lockActive = user.lockedUntil !== null && user.lockedUntil.getTime() > now;
+    if (lockActive) return;
+
+    const windowMs = LOCKOUT_MINUTES * 60 * 1000;
+    const stale = user.lockedUntil !== null && user.lockedUntil.getTime() <= now;
+    const failedLogins = stale ? 1 : user.failedLogins + 1;
+
     const lockedUntil =
-      failedLogins >= MAX_FAILED_LOGINS
-        ? new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000)
-        : user.lockedUntil;
+      failedLogins >= MAX_FAILED_LOGINS ? new Date(now + windowMs) : null;
     await this.repo.recordFailedLogin(user.id, failedLogins, lockedUntil);
   }
 

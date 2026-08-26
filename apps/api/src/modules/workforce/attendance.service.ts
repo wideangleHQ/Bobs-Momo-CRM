@@ -12,7 +12,7 @@ import {
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
-import { narrow } from './employees.service';
+import { narrowOutlets as narrow } from '../../common/types/request';
 
 // Lateness is only meaningful against a commitment, and ten minutes of it is
 // forgiven because a bus is a bus.

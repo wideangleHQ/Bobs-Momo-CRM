@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import type { Request } from 'express';
 import type { PermissionKey, ScopeModifier } from '@bobs-momo/shared';
 
@@ -35,4 +36,20 @@ export interface AuthedRequest extends Request {
   user?: AuthedUser;
   grant?: Grant;
   scope?: RequestScope;
+}
+
+/**
+ * Narrows an optional requested outlet against what the caller can reach.
+ *
+ * Lived in two service files under two names, which is how an outlet scoping
+ * rule eventually gets fixed in one copy and not the other. An outlet the
+ * caller cannot reach reads as not existing, per the 404-not-403 rule.
+ */
+export function narrowOutlets(asked: string | undefined, scope: RequestScope): string[] {
+  if (!asked) return scope.outletIds;
+  const allowed = scope.outletIds.filter((id) => id === asked);
+  if (allowed.length === 0) {
+    throw new NotFoundException({ code: 'COMMON_NOT_FOUND', message: 'Not found' });
+  }
+  return allowed;
 }

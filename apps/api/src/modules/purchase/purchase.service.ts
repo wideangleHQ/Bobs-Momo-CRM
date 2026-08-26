@@ -12,9 +12,10 @@ import {
 import { DocumentNumberService } from '../../common/documents/document-number.service';
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { narrowOutlets } from '../../common/types/request';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
 import { InventoryService } from '../inventory/inventory.service';
-import { assertTransition, narrowOutlets } from './purchase-request.service';
+import { assertTransition } from './purchase-request.service';
 
 const { Decimal } = Prisma;
 
@@ -370,13 +371,21 @@ export class PurchaseService {
   private async buildPriceWarnings(
     lines: { itemId: string; unitPrice: Prisma.Decimal }[],
   ): Promise<PriceWarning[]> {
+    // One query for the whole bill. This used to run a findFirst per line, so a
+    // twelve line vegetable bill cost twelve sequential round trips before the
+    // transaction even opened, on the slowest screen the purchase manager uses.
+    // distinct plus orderBy gives the same latest-per-item the loop hand-rolled.
+    const latest = await this.prisma.itemPriceHistory.findMany({
+      where: { itemId: { in: lines.map((l) => l.itemId) } },
+      distinct: ['itemId'],
+      orderBy: [{ observedOn: 'desc' }, { createdAt: 'desc' }],
+      include: { item: { select: { name: true } } },
+    });
+    const byItem = new Map(latest.map((row) => [row.itemId, row]));
+
     const warnings: PriceWarning[] = [];
     for (const line of lines) {
-      const last = await this.prisma.itemPriceHistory.findFirst({
-        where: { itemId: line.itemId },
-        orderBy: [{ observedOn: 'desc' }, { createdAt: 'desc' }],
-        include: { item: { select: { name: true } } },
-      });
+      const last = byItem.get(line.itemId);
       // No prior observation means no comparison. Reporting "0 percent change"
       // for an item first bought today is a lie a manager would act on.
       if (!last || last.unitPrice.isZero()) continue;

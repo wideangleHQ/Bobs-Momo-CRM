@@ -11,6 +11,7 @@ import {
 import { DocumentNumberService } from '../../common/documents/document-number.service';
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { narrowOutlets } from '../../common/types/request';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
 
 // The SRS is explicit: one manager decision, no approval chain. Every allowed
@@ -225,13 +226,6 @@ export function assertTransition(from: PurchaseRequestStatus, to: string): void 
       { currentStatus: from, attempted: to },
     );
   }
-}
-
-export function narrowOutlets(asked: string | undefined, scope: RequestScope): string[] {
-  if (!asked) return scope.outletIds;
-  const allowed = scope.outletIds.filter((id) => id === asked);
-  if (allowed.length === 0) throw DomainError.notFound();
-  return allowed;
 }
 
 type RequestRow = Prisma.PurchaseRequestGetPayload<{ include: typeof REQUEST_INCLUDE }>;

@@ -10,6 +10,7 @@ import {
 } from '@bobs-momo/shared';
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { narrowOutlets as narrow } from '../../common/types/request';
 import type { RequestScope } from '../../common/types/request';
 
 const EMPLOYEE_INCLUDE = {
@@ -194,13 +195,6 @@ export class EmployeesService {
       'That employee does not exist',
     );
   }
-}
-
-export function narrow(asked: string | undefined, scope: RequestScope): string[] {
-  if (!asked) return scope.outletIds;
-  const allowed = scope.outletIds.filter((id) => id === asked);
-  if (allowed.length === 0) throw DomainError.notFound();
-  return allowed;
 }
 
 type EmployeeRow = Prisma.EmployeeGetPayload<{ include: typeof EMPLOYEE_INCLUDE }>;

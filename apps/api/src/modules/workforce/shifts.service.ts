@@ -10,7 +10,7 @@ import {
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
-import { narrow } from './employees.service';
+import { narrowOutlets as narrow } from '../../common/types/request';
 
 // Times come in as HH:MM in IST and are stored as absolute instants. A shift
 // ending at or before it starts is treated as crossing midnight, so 22:00 to

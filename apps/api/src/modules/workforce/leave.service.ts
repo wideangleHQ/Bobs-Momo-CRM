@@ -11,7 +11,7 @@ import {
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
-import { narrow } from './employees.service';
+import { narrowOutlets as narrow } from '../../common/types/request';
 
 // A typo like 2036-09-01 should not leave a request sitting in the pending list
 // for ten years.

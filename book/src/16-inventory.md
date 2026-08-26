@@ -172,10 +172,10 @@ at that instant.
 | `RECEIVED` | + | no | `inventory.transaction.create` | vendor delivery, normally written by the purchase service | up to 7 days |
 | `ISSUED` | - | no | `inventory.transaction.create` | kitchen draws stock for prep or service | up to 7 days |
 | `WASTAGE` | - | yes | `inventory.transaction.create` | spoilage, spillage, a dropped tray | up to 7 days |
-| `ADJUSTMENT` | + or - | yes | `inventory.transaction.adjust` | physical count variance, correcting an earlier mistake, void of a purchase | up to 7 days |
+| `ADJUSTMENT` | + or - | yes | `inventory.adjustment.create` | physical count variance, correcting an earlier mistake, void of a purchase | up to 7 days |
 | `TRANSFER_OUT` | - | no | `inventory.transfer.create` | stock sent to the other outlet | today only |
 | `TRANSFER_IN` | + | no | `inventory.transfer.create` | paired row at the receiving outlet | today only |
-| `CLOSING` | 0 | no | `inventory.closing.record` | end of day count, one per item per date | today only |
+| `CLOSING` | 0 | no | `inventory.transaction.create` | end of day count, one per item per date | today only |
 
 Backdating is capped at 7 calendar days by `INVENTORY_BACKDATE_LIMIT_DAYS`.
 A `businessDate` in the future is always rejected. The 7 day window exists
@@ -183,7 +183,7 @@ because staff write on paper for two days and then catch up, and a hard
 today-only rule would push them straight back to the paper register. The window
 is short enough that a reconciled month does not move under the owner's feet.
 
-`ADJUSTMENT` sits behind its own permission key, `inventory.transaction.adjust`,
+`ADJUSTMENT` sits behind its own permission key, `inventory.adjustment.create`,
 which the kitchen manager does not hold. Anyone can record that stock was used
 or wasted. Only an inventory manager or above can declare that the ledger itself
 was wrong.
@@ -612,8 +612,8 @@ name.
 > `inventory.category.create`, `inventory.unit.read`, `inventory.unit.create`,
 > `inventory.stock.read`, `inventory.stock.configure`,
 > `inventory.transaction.create`, `inventory.transaction.read`,
-> `inventory.transaction.adjust`, `inventory.transfer.create`,
-> `inventory.closing.record` and `inventory.report.read`. Chapter 14 owns the
+> `inventory.adjustment.create`, `inventory.transfer.create`,
+> `inventory.transaction.create` and `inventory.report.read`. Chapter 14 owns the
 > role mapping.
 
 > **Spec note:** the error envelope sample in chapter 15 uses `INSUFFICIENT_STOCK` as an illustrative code. The registered
@@ -914,7 +914,7 @@ without an operational event behind it and the recipient could not act on it.
 ### POST /inventory/transactions
 
 Permission `inventory.transaction.create`, and additionally
-`inventory.transaction.adjust` when `type` is `ADJUSTMENT`. Scope `OWN_OUTLET`
+`inventory.adjustment.create` when `type` is `ADJUSTMENT`. Scope `OWN_OUTLET`
 or `ALL_OUTLETS`. Accepts `Idempotency-Key`. Status 201.
 
 ```ts
@@ -960,7 +960,7 @@ their own endpoints because they are never single-row operations.
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | schema failure |
 | 400 | `REASON_REQUIRED` | reason missing on `WASTAGE` or `ADJUSTMENT` |
-| 403 | `FORBIDDEN` | `ADJUSTMENT` without `inventory.transaction.adjust` |
+| 403 | `FORBIDDEN` | `ADJUSTMENT` without `inventory.adjustment.create` |
 | 404 | `ITEM_NOT_FOUND` | unknown item |
 | 404 | `OUTLET_NOT_IN_SCOPE` | outlet outside caller scope |
 | 409 | `IDEMPOTENCY_KEY_CONFLICT` | key reused with a different body |
@@ -1143,7 +1143,7 @@ export const createTransferSchema = z.object({
 
 ### POST /inventory/closing
 
-Permission `inventory.closing.record`. Scope `OWN_OUTLET` or `ALL_OUTLETS`.
+Permission `inventory.transaction.create`. Scope `OWN_OUTLET` or `ALL_OUTLETS`.
 Status 201.
 
 ```ts

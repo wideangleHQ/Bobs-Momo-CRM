@@ -7,10 +7,13 @@ machine and a manager decision. Salary is a filing cabinet with a lock on it.
 Requirements implemented: FR-EMP-003 (leave request and approval) and
 FR-EMP-004 (leave and salary history).
 
-> **Spec note:** this chapter introduces the permission keys
-> `workforce.leave.create`, `workforce.leave.read`, `workforce.leave.cancel`
-> and `workforce.salary.write` (`workforce.leave.decide` and
-> `workforce.salary.read` are already in chapter 14); and the error codes
+> **Spec note:** every permission key this chapter uses is already in the
+> chapter 14 matrix: `workforce.leave.request`, `workforce.leave.read`,
+> `workforce.leave.decide`, `workforce.salary.read` and
+> `workforce.salary.write`. Cancelling accepts either
+> `workforce.leave.decide` or `workforce.leave.request` at SELF scope, which
+> is how an employee can withdraw their own pending request without being able
+> to touch anybody else's. This chapter introduces the error codes
 > `LEAVE_PAST_DATE`, `LEAVE_OVERLAP`, `LEAVE_WINDOW_EXCEEDED`,
 > `LEAVE_INVALID_RANGE`, `LEAVE_HALF_DAY_RANGE`, `LEAVE_NOT_PENDING`,
 > `LEAVE_ALREADY_STARTED` and `SALARY_PERIOD_OVERLAP`.
@@ -26,7 +29,7 @@ FR-EMP-004 (leave and salary history).
                    └──┬───┬───┬──┘
                       │   │   │
      approve ─────────┘   │   └───────── cancel
-     workforce.leave      │              workforce.leave.cancel
+     workforce.leave      │              workforce.leave.request
      .decide              │              actor: the employee
      actor: Store Mgr     │              (own request only)
           │               │                        │
@@ -48,10 +51,10 @@ Four states, and every transition table entry below is enforced in
 
 | From | To | Endpoint | Permission | Actor | Event emitted |
 |---|---|---|---|---|---|
-| (none) | PENDING | `POST /leave-requests` | `workforce.leave.create` | Employee, or manager filing for staff | `LEAVE_REQUESTED` |
+| (none) | PENDING | `POST /leave-requests` | `workforce.leave.request` | Employee, or manager filing for staff | `LEAVE_REQUESTED` |
 | PENDING | APPROVED | `POST /leave-requests/:id/approve` | `workforce.leave.decide` | Store Manager of the employee's outlet | `LEAVE_DECIDED` |
 | PENDING | REJECTED | `POST /leave-requests/:id/reject` | `workforce.leave.decide` | Store Manager | `LEAVE_DECIDED` |
-| PENDING | CANCELLED | `POST /leave-requests/:id/cancel` | `workforce.leave.cancel` | The requesting employee | none |
+| PENDING | CANCELLED | `POST /leave-requests/:id/cancel` | `workforce.leave.request` at SELF, or `workforce.leave.decide` | The requesting employee, or a manager | none |
 | APPROVED | CANCELLED | `POST /leave-requests/:id/cancel` | `workforce.leave.decide` | Store Manager, future dates only | `LEAVE_DECIDED` |
 
 There is one manager decision and no second approval layer. The SRS is explicit
@@ -440,7 +443,7 @@ Errors: 400 `VALIDATION_FAILED`, 403 `FORBIDDEN`.
 
 ### POST /leave-requests
 
-Permission `workforce.leave.create`, scope SELF or OWN_OUTLET, 201. Schema and
+Permission `workforce.leave.request`, scope SELF or OWN_OUTLET, 201. Schema and
 guards are in the sections above.
 
 Errors: 400 `LEAVE_INVALID_RANGE`, 400 `LEAVE_HALF_DAY_RANGE`,
@@ -507,7 +510,7 @@ Errors: 409 `LEAVE_NOT_PENDING`, 403 `FORBIDDEN`, 404 `NOT_FOUND`.
 
 | | |
 |---|---|
-| Permission | `workforce.leave.cancel` for own PENDING, `workforce.leave.decide` for APPROVED |
+| Permission | `workforce.leave.request` at SELF for own PENDING, `workforce.leave.decide` for APPROVED |
 | Scope | SELF or OWN_OUTLET |
 | Success | 200 |
 

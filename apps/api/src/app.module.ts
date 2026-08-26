@@ -14,6 +14,7 @@ import { HealthModule } from './modules/health/health.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { PurchaseModule } from './modules/purchase/purchase.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
+import { WorkforceModule } from './modules/workforce/workforce.module';
 
 // Wiring only. Keep imports alphabetical so two lanes adding a module merge cleanly.
 @Module({
@@ -28,6 +29,7 @@ import { VendorsModule } from './modules/vendors/vendors.module';
     PurchaseModule,
     RedisModule,
     VendorsModule,
+    WorkforceModule,
   ],
   providers: [
     // Order matters: each guard reads what the previous one attached.

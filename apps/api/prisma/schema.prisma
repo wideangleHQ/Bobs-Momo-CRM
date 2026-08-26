@@ -600,6 +600,7 @@ model ChecklistTemplateItem {
   templateId      String  @db.Uuid
   sortOrder       Int
   label           String
+  isActive        Boolean @default(true)
   requiresPhoto   Boolean @default(false)
   requiresNote    Boolean @default(false)
   failCreatesTask Boolean @default(false)
@@ -665,6 +666,10 @@ model Task {
   @@index([outletId, status, dueAt])
   @@index([assigneeId, status])
   @@index([status, dueAt]) // drives the overdue sweep
+  // Stops the recurrence generator creating a second instance for the same
+  // recurrence, outlet and trading day when two ticks overlap. A read-then-write
+  // check alone can still race.
+  @@unique([recurrenceId, outletId, businessDate], name: "task_recurrence_day_uniq")
 }
 
 model TaskChecklistResult {

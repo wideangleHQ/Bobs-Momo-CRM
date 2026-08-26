@@ -77,6 +77,7 @@
 - [Acceptance criteria and the UAT script](40-acceptance-and-uat.md)
 - [Risk register](41-risk-register.md)
 - [Open questions for the client](42-open-questions.md)
+- [What is not built](43-what-is-not-built.md)
 
 ---
 

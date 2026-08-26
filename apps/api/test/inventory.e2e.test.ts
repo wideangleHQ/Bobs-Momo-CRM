@@ -386,3 +386,28 @@ describe('the reorder list is complete', () => {
     expect(data.every((r) => r.isBelowReorder)).toBe(true);
   });
 });
+
+// The ledger history is the screen a manager opens to answer "where did 6 kg of
+// chicken mince go". Nothing proved it was outlet scoped.
+describe('the ledger is outlet scoped', () => {
+  test('an OWN_OUTLET role sees only its own rows, and a foreign outlet is 404', async () => {
+    const res = await api('GET', '/inventory/transactions?pageSize=100', undefined, {
+      authorization: `Bearer ${staffToken}`,
+    });
+    expect(res.status).toBe(200);
+    const rows = res.body?.['data'] as { outletCode: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.outletCode === 'BM-SAHEED')).toBe(true);
+
+    const crossed = await api('GET', `/inventory/transactions?outletId=${otherOutletId}`, undefined, {
+      authorization: `Bearer ${staffToken}`,
+    });
+    expect(crossed.status).toBe(404);
+  });
+
+  test('the date range filter actually excludes rows outside it', async () => {
+    const res = await api('GET', '/inventory/transactions?from=2020-01-01&to=2020-01-02');
+    expect(res.status).toBe(200);
+    expect((res.body?.['meta'] as { total: number }).total).toBe(0);
+  });
+});

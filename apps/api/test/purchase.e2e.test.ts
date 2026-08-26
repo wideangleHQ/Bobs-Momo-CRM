@@ -14,7 +14,8 @@ let app: INestApplication;
 let url: string;
 
 let buyerToken: string; // PURCHASE_MANAGER, ALL_OUTLETS on purchase keys
-let askerToken: string; // KITCHEN_MANAGER, OWN_OUTLET, may request but not approve
+let askerToken: string;
+let storeToken: string; // STORE_MANAGER, OWN_OUTLET on purchase.record.read
 let outletId: string;
 let vendorId: string;
 let itemA: string;
@@ -23,6 +24,7 @@ let itemB: string;
 const PASSWORD = 'saheed-momo-2026';
 const BUYER = 'e2e.pur.buyer';
 const ASKER = 'e2e.pur.asker';
+const STORE = 'e2e.pur.store';
 const VENDOR = 'E2E Test Supplier';
 const SKUS = ['ITM-E2E-PUR-A', 'ITM-E2E-PUR-B'];
 
@@ -48,7 +50,7 @@ function errorCode(res: { body: Record<string, unknown> | null }): string | unde
 
 async function cleanup(): Promise<void> {
   const testUsers = await prisma.user.findMany({
-    where: { username: { in: [BUYER, ASKER] } },
+    where: { username: { in: [BUYER, ASKER, STORE] } },
     select: { id: true },
   });
   const ids = testUsers.map((u) => u.id);
@@ -62,7 +64,7 @@ async function cleanup(): Promise<void> {
   await prisma.vendorItem.deleteMany({ where: { item: { sku: { in: SKUS } } } });
   await prisma.inventoryItem.deleteMany({ where: { sku: { in: SKUS } } });
   await prisma.vendor.deleteMany({ where: { name: { startsWith: 'E2E Test' } } });
-  await prisma.user.deleteMany({ where: { username: { in: [BUYER, ASKER] } } });
+  await prisma.user.deleteMany({ where: { username: { in: [BUYER, ASKER, STORE] } } });
 }
 
 beforeAll(async () => {
@@ -89,6 +91,12 @@ beforeAll(async () => {
     data: { username: ASKER, passwordHash: hash, roleKey: 'KITCHEN_MANAGER', mustReset: false },
   });
   await prisma.userOutlet.create({ data: { userId: asker.id, outletId } });
+  // purchase.record.read is granted at OWN_OUTLET only to a store manager. The
+  // purchase manager holds it at ALL_OUTLETS, so it cannot prove the narrowing.
+  const store = await prisma.user.create({
+    data: { username: STORE, passwordHash: hash, roleKey: 'STORE_MANAGER', mustReset: false },
+  });
+  await prisma.userOutlet.create({ data: { userId: store.id, outletId } });
 
   const login = async (identifier: string) => {
     const res = await fetch(`${url}/auth/login`, {
@@ -96,10 +104,15 @@ beforeAll(async () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ identifier, password: PASSWORD }),
     });
-    return ((await res.json()) as { accessToken: string }).accessToken;
+    const token = ((await res.json()) as { accessToken?: string }).accessToken;
+    // A silent undefined here falls back to the buyer's ALL_OUTLETS token in
+    // api(), so a scoping test would pass while proving nothing.
+    if (!token) throw new Error(`could not sign in as ${identifier}`);
+    return token;
   };
   buyerToken = await login(BUYER);
   askerToken = await login(ASKER);
+  storeToken = await login(STORE);
 
   const category = await prisma.itemCategory.findFirstOrThrow();
   const unit = await prisma.unit.findFirstOrThrow({ where: { code: 'KG' } });
@@ -461,5 +474,61 @@ describe('concurrent void', () => {
     // One receives the stock. The other is told the request is spoken for.
     expect(ok.length).toBe(1);
     expect(results.filter((r) => r.status === 409).length).toBe(1);
+  });
+});
+
+// Every purchase read endpoint was untested. They carry vendor pricing and
+// totals, and nothing pinned down that they are outlet scoped.
+describe('purchase reads are outlet scoped', () => {
+  test('an OWN_OUTLET caller cannot read the other outlet purchases', async () => {
+    const created = await api('POST', '/purchases', {
+      outletId,
+      vendorId,
+      purchaseDate: toBusinessDate(),
+      lines: [{ itemId: itemA, quantity: 2, unitPrice: 75 }],
+    });
+    const id = created.body?.['id'] as string;
+    const other = await prisma.outlet.findFirstOrThrow({ where: { code: 'BM-PATIA' } });
+
+    // In scope, by the buyer who recorded it.
+    const mine = await api('GET', `/purchases/${id}`);
+    expect(mine.status).toBe(200);
+    expect(mine.body?.['id']).toBe(id);
+
+    // Asking for an outlet the caller cannot reach is a 404, not an empty list.
+    const crossed = await api('GET', `/purchases?outletId=${other.id}`, undefined, storeToken);
+    expect(crossed.status).toBe(404);
+
+    // And the unfiltered list never carries a row from outside the scope.
+    const list = await api('GET', '/purchases?pageSize=100', undefined, storeToken);
+    expect(list.status).toBe(200);
+    const rows = list.body?.['data'] as { outletId: string }[];
+    expect(rows.every((r) => r.outletId === outletId)).toBe(true);
+  });
+
+  test('the request list and detail are scoped the same way', async () => {
+    const other = await prisma.outlet.findFirstOrThrow({ where: { code: 'BM-PATIA' } });
+    const crossed = await api(
+      'GET',
+      `/purchase-requests?outletId=${other.id}`,
+      undefined,
+      askerToken,
+    );
+    expect(crossed.status).toBe(404);
+
+    const list = await api('GET', '/purchase-requests?pageSize=100', undefined, askerToken);
+    const rows = list.body?.['data'] as { outletId: string }[];
+    expect(rows.every((r) => r.outletId === outletId)).toBe(true);
+  });
+
+  test('price history returns the observations the warning flag reads', async () => {
+    const res = await api('GET', `/purchases/price-history?itemId=${itemA}&pageSize=100`);
+    expect(res.status).toBe(200);
+    const rows = res.body?.['data'] as { itemId: string; observedOn: string }[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.itemId === itemA)).toBe(true);
+    // Newest first, which is the order the 25 percent flag depends on.
+    const dates = rows.map((r) => r.observedOn);
+    expect([...dates].sort().reverse()).toEqual(dates);
   });
 });

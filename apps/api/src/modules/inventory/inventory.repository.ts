@@ -28,7 +28,7 @@ export class InventoryRepository {
   async lockStock(tx: Tx, itemId: string, outletId: string): Promise<LockedStockRow> {
     await tx.$executeRaw`
       INSERT INTO "ItemStock" ("id", "itemId", "outletId", "qtyOnHand", "updatedAt")
-      VALUES (gen_random_uuid(), ${itemId}::uuid, ${outletId}::uuid, 0, now())
+      VALUES (gen_random_uuid(), ${itemId}::uuid, ${outletId}::uuid, 0, (now() AT TIME ZONE 'UTC'))
       ON CONFLICT ("itemId", "outletId") DO NOTHING`;
 
     const rows = await tx.$queryRaw<LockedStockRow[]>`

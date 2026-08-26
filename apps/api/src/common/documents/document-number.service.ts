@@ -17,7 +17,7 @@ export class DocumentNumberService {
   async next(tx: Prisma.TransactionClient, kind: string, year: number): Promise<number> {
     const rows = await tx.$queryRaw<CounterRow[]>`
       INSERT INTO "DocumentCounter" ("kind", "year", "lastValue", "updatedAt")
-      VALUES (${kind}, ${year}, 1, now())
+      VALUES (${kind}, ${year}, 1, (now() AT TIME ZONE 'UTC'))
       ON CONFLICT ("kind", "year")
       DO UPDATE SET "lastValue" = "DocumentCounter"."lastValue" + 1, "updatedAt" = now()
       RETURNING "lastValue"`;

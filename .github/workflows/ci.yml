@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: bobsmomo
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: bobsmomo_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U bobsmomo"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://bobsmomo:localdev@localhost:5432/bobsmomo_test?schema=public
+      DIRECT_URL: postgresql://bobsmomo:localdev@localhost:5432/bobsmomo_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci0000000000000000000000000000000000000000000000000000000000000a
+      JWT_REFRESH_SECRET: ci0000000000000000000000000000000000000000000000000000000000000b
+      NODE_ENV: test
+      TZ: Asia/Kolkata
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      # Prisma's CLI and the production build run on Node. ADR-002.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: bun install --frozen-lockfile
+      - run: bun run shared:build
+      - run: bunx prisma generate
+        working-directory: apps/api
+      - run: bunx prisma migrate deploy
+        working-directory: apps/api
+
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun test
+      - run: bun run build

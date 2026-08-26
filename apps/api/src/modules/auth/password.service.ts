@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { randomInt } from 'node:crypto';
 
 // Chapter 13. Tuned so a hash costs roughly 100ms on the Railway container.
 const OPTIONS: argon2.Options = {
@@ -59,10 +60,14 @@ export class PasswordService {
     return null;
   }
 
-  /** "momo-7431-kite". Read out loud by a manager, so no ambiguous glyphs. */
+  /**
+   * "momo-7431-kite". Read out loud by a manager, so no ambiguous glyphs.
+   * randomInt, not Math.random: this is a live credential, and Math.random is
+   * seeded predictably enough that an attacker who sees one reset can narrow
+   * the next.
+   */
   generateTemporary(): string {
-    const pick = (): string => WORDS[Math.floor(Math.random() * WORDS.length)] as string;
-    const digits = String(1000 + Math.floor(Math.random() * 9000));
-    return `${pick()}-${digits}-${pick()}`;
+    const pick = (): string => WORDS[randomInt(WORDS.length)] as string;
+    return `${pick()}-${randomInt(1000, 10000)}-${pick()}`;
   }
 }

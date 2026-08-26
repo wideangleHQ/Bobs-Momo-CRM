@@ -1,7 +1,9 @@
 import { Controller, Get, HttpCode } from '@nestjs/common';
+import { Public } from '../../common/decorators/permissions.decorator';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(

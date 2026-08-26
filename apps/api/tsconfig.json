@@ -6,7 +6,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
-    "types": ["node", "jest"],
+    "types": ["node", "bun"],
     "paths": { "@/*": ["src/*"] }
   },
   "include": ["src/**/*", "prisma/**/*", "test/**/*"]

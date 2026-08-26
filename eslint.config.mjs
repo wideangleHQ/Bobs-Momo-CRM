@@ -10,7 +10,12 @@ export default ts.config(
       parserOptions: {
         projectService: {
           // Config files and the bun test file sit outside every tsconfig project.
-          allowDefaultProject: ['*.mjs', 'apps/web/*.mjs', 'packages/shared/src/*.test.ts'],
+          allowDefaultProject: [
+            '*.mjs',
+            'apps/web/*.mjs',
+            'scripts/*.mjs',
+            'packages/shared/src/*.test.ts',
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -23,5 +28,10 @@ export default ts.config(
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
     },
+  },
+  {
+    // Node scripts, not part of any app bundle.
+    files: ['**/*.mjs'],
+    languageOptions: { globals: { console: 'readonly', process: 'readonly' } },
   },
 );

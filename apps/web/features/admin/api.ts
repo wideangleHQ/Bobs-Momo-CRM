@@ -104,13 +104,13 @@ export const adminKeys = {
 };
 
 export const listUsers = (f: { q?: string; page?: number; pageSize?: number }) =>
-  apiGet<AdminUserList>(`/users${qs({ ...f })}`);
+  apiGet<AdminUserList>(`/admin/users${qs({ ...f })}`);
 
 export const createUser = (body: CreateUserBody) =>
-  apiPost<ProvisionedCredential>('/users', body);
+  apiPost<ProvisionedCredential>('/admin/users', body);
 
 export const updateUser = (id: string, body: Partial<Omit<CreateUserBody, 'username'>> & { status?: string }) =>
-  apiPatch<AdminUser>(`/users/${id}`, body);
+  apiPatch<AdminUser>(`/admin/users/${id}`, body);
 
 export const resetUserPassword = (userId: string, reason: string) =>
   apiPost<ProvisionedCredential>('/auth/admin/reset-password', { userId, reason });
@@ -148,4 +148,4 @@ export const listAuditLog = (f: {
   outletId?: string;
   page?: number;
   pageSize?: number;
-}) => apiGet<AuditList>(`/audit-log${qs({ ...f })}`);
+}) => apiGet<AuditList>(`/admin/audit-log${qs({ ...f })}`);

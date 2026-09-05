@@ -7,6 +7,14 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { assertSecretsDiffer, corsOrigins, env } from './config/env';
 
 async function bootstrap(): Promise<void> {
+  // Load .env before schema validation. Node ≥ 20.12 built-in; no-op in
+  // production where vars are injected by the platform (missing file is ignored).
+  try {
+    (process as NodeJS.Process & { loadEnvFile?(p: string): void }).loadEnvFile?.('.env');
+  } catch {
+    // file absent in production — env vars must be injected externally
+  }
+
   const cfg = env();
   assertSecretsDiffer();
   process.env.TZ = cfg.TZ;

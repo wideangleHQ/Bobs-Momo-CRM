@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "nest start --watch",
+    "start:dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main",
     "lint": "eslint src prisma --max-warnings 0",
@@ -14,7 +15,10 @@
     "db:deploy": "prisma migrate deploy",
     "db:reset": "prisma migrate reset",
     "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "db:provision:dry": "bun run prisma/provision-initial-users.ts --dry-run",
+    "db:provision": "bun run prisma/provision-initial-users.ts",
+    "db:verify-users": "bun run prisma/verify-initial-users.ts"
   },
   "prisma": {
     "seed": "bun run prisma/seed.ts"

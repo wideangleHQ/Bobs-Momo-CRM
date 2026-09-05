@@ -10,9 +10,9 @@ interface UnreadCount {
 }
 
 /**
- * Placeholder until the notification module lands. The endpoint may not exist
- * yet, so a failure renders a plain bell rather than an error.
- */
+  * Placeholder until the notification module lands. The endpoint may not exist
+  * yet, so a failure renders a plain bell rather than an error.
+  */
 export function NotificationBell() {
   const { data } = useQuery({
     queryKey: ['notifications', 'unread-count'],
@@ -28,14 +28,13 @@ export function NotificationBell() {
     <Link
       href="/notifications"
       aria-label={count > 0 ? `Notifications, ${count} unread` : 'Notifications'}
-      className="relative flex h-11 w-11 items-center justify-center rounded-md text-text hover:bg-surface-muted"
+      className="relative flex h-9 w-9 items-center justify-center rounded-xl text-zinc-500 transition-all duration-150 hover:bg-zinc-100 hover:text-zinc-800"
     >
-      <Icon name="bell" className="h-6 w-6" />
+      <Icon name="bell" className="h-[18px] w-[18px]" />
       {count > 0 ? (
-        <span className="absolute right-1.5 top-1.5 min-w-4 rounded-full bg-danger px-1 text-center text-[10px] font-semibold leading-4 text-white tabular-nums">
-          {count > 99 ? '99+' : count}
-        </span>
+        <span className="absolute right-1.5 top-1.5 flex h-2 w-2 items-center justify-center rounded-full bg-red-600 border border-white" />
       ) : null}
     </Link>
   );
 }
+

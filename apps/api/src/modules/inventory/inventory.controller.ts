@@ -12,14 +12,18 @@ import {
   Req,
 } from '@nestjs/common';
 import {
+  createCategorySchema,
   createItemSchema,
+  createUnitSchema,
   listItemsQuery,
   listStockQuery,
   listTransactionsQuery,
   recordTransactionSchema,
   setReorderLevelSchema,
   updateItemSchema,
+  type CreateCategoryDto,
   type CreateItemDto,
+  type CreateUnitDto,
   type ListItemsQuery,
   type ListStockQuery,
   type ListTransactionsQuery,
@@ -34,6 +38,8 @@ import { IdempotencyService } from '../../common/idempotency/idempotency.service
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { grantsFor } from '../../common/permissions';
 import type { AuthedRequest, AuthedUser, RequestScope } from '../../common/types/request';
+import { actorOf } from '../admin/audit-writer';
+import { AdminReferenceService } from '../admin/reference.service';
 import { InventoryService, type RecordedTransaction } from './inventory.service';
 
 @Controller('inventory')
@@ -41,7 +47,40 @@ export class InventoryController {
   constructor(
     private readonly service: InventoryService,
     private readonly idempotency: IdempotencyService,
+    private readonly reference: AdminReferenceService,
   ) {}
+
+  @Get('categories')
+  @Permissions('inventory.item.read')
+  listCategories() {
+    return this.service.listCategories();
+  }
+
+  @Post('categories')
+  @Permissions('inventory.category.manage')
+  @HttpCode(HttpStatus.CREATED)
+  createCategory(
+    @Body(new ZodValidationPipe(createCategorySchema)) dto: CreateCategoryDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.reference.createCategory(dto, actorOf(req));
+  }
+
+  @Get('units')
+  @Permissions('inventory.item.read')
+  listUnits() {
+    return this.service.listUnits();
+  }
+
+  @Post('units')
+  @Permissions('inventory.unit.manage')
+  @HttpCode(HttpStatus.CREATED)
+  createUnit(
+    @Body(new ZodValidationPipe(createUnitSchema)) dto: CreateUnitDto,
+    @Req() req: AuthedRequest,
+  ) {
+    return this.reference.createUnit(dto, actorOf(req));
+  }
 
   @Get('items')
   @Permissions('inventory.item.read')

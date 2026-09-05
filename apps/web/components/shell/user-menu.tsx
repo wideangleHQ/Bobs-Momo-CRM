@@ -26,19 +26,26 @@ export function UserMenu() {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Account, ${user.fullName}`}
-        className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-bg text-sm font-semibold text-primary"
+        className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white transition-all duration-150 hover:bg-red-700 hover:ring-2 hover:ring-red-500 hover:ring-offset-2 select-none cursor-pointer"
       >
         {initials(user.fullName)}
       </button>
 
       <Sheet open={open} onOpenChange={setOpen} title="Account">
         <div className="space-y-4 p-2">
-          <div>
-            <p className="text-base font-semibold text-text">{user.fullName}</p>
-            <p className="text-sm text-text-muted">{user.username}</p>
-            <p className="mt-1 text-xs font-medium text-text-muted">
-              {user.roleKey.replace(/_/g, ' ').toLowerCase()}
-            </p>
+          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-10 w-10 rounded-full bg-red-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
+                {initials(user.fullName)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-zinc-900 truncate">{user.fullName}</p>
+                <p className="text-xs font-medium text-zinc-500 truncate">{user.username}</p>
+              </div>
+            </div>
+            <div className="inline-flex items-center rounded-md bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-semibold text-red-700 uppercase tracking-wider">
+              {user.roleKey.replace(/_/g, ' ')}
+            </div>
           </div>
           <Button
             variant="secondary"
@@ -58,3 +65,4 @@ export function UserMenu() {
     </>
   );
 }
+

@@ -1,14 +1,61 @@
+# ============================================
+# Dependencies
+# ============================================
 node_modules/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# ============================================
+# Build / Generated Output
+# ============================================
 dist/
 .next/
 out/
+.turbo/
 *.tsbuildinfo
+coverage/
+
+# ============================================
+# Environment / Secrets
+# ============================================
 .env
 .env.local
 .env.*.local
 !.env.example
-coverage/
-.turbo/
-book/book/
+
+# ============================================
+# Database
+# ============================================
 apps/api/prisma/*.db
+apps/api/prisma/*.db-journal
+apps/api/prisma/*.db-shm
+apps/api/prisma/*.db-wal
+
+# ============================================
+# Local / OS Files
+# ============================================
 .DS_Store
+Thumbs.db
+*.log
+
+# ============================================
+# Claude / AI Development Files
+# ============================================
+.claude/
+.agents/
+skills-lock.json
+
+# ============================================
+# Local Project / Temporary Files
+# ============================================
+book/book/
+book.zip
+
+# ============================================
+# Editor
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo

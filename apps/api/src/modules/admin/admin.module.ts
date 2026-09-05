@@ -18,5 +18,6 @@ import { AdminUsersService } from './users.service';
     AdminAuditService,
     PasswordService,
   ],
+  exports: [AdminReferenceService],
 })
 export class AdminModule {}

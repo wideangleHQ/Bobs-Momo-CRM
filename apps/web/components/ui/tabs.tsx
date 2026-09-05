@@ -23,7 +23,7 @@ export function Tabs({
   return (
     <div
       role="tablist"
-      className={cn('flex gap-1 overflow-x-auto border-b border-border', className)}
+      className={cn('flex gap-1 overflow-x-auto border-b border-zinc-100 bg-white px-1', className)}
     >
       {tabs.map((t) => {
         const active = t.key === value;
@@ -35,15 +35,22 @@ export function Tabs({
             aria-selected={active}
             onClick={() => onChange(t.key)}
             className={cn(
-              'h-11 shrink-0 border-b-2 px-3 text-sm font-medium whitespace-nowrap',
+              'h-11 shrink-0 border-b-2 px-3 text-sm font-semibold whitespace-nowrap transition-all duration-150 cursor-pointer select-none',
               active
-                ? 'border-primary text-primary'
-                : 'border-transparent text-text-muted hover:text-text',
+                ? 'border-red-600 text-red-600'
+                : 'border-transparent text-zinc-500 hover:text-zinc-900 hover:border-zinc-200',
             )}
           >
             {t.label}
             {typeof t.count === 'number' ? (
-              <span className="ml-1.5 tabular-nums">{t.count}</span>
+              <span
+                className={cn(
+                  'ml-2 rounded-md px-1.5 py-0.5 text-xs tabular-nums font-mono',
+                  active ? 'bg-red-50 text-red-600' : 'bg-zinc-100 text-zinc-500',
+                )}
+              >
+                {t.count}
+              </span>
             ) : null}
           </button>
         );
@@ -51,3 +58,4 @@ export function Tabs({
     </div>
   );
 }
+

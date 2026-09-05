@@ -86,6 +86,18 @@ export class InventoryService {
     private readonly repo: InventoryRepository,
   ) {}
 
+  // ---- reference data (read-only, accessible to any item.read role) ------
+
+  async listCategories() {
+    const rows = await this.prisma.itemCategory.findMany({ orderBy: { name: 'asc' } });
+    return { data: rows.map((c) => ({ id: c.id, name: c.name })) };
+  }
+
+  async listUnits() {
+    const rows = await this.prisma.unit.findMany({ orderBy: { code: 'asc' } });
+    return { data: rows.map((u) => ({ id: u.id, code: u.code, name: u.name })) };
+  }
+
   // ---- items -------------------------------------------------------------
 
   async listItems(query: ListItemsQuery) {

@@ -109,8 +109,16 @@ export class AdminUsersService {
           mustReset: true,
           outlets: { create: dto.outletIds.map((outletId) => ({ outletId })) },
         },
-        include: USER_INCLUDE,
       });
+
+      if (dto.employeeId) {
+        const linked = await tx.employee.updateMany({
+          where: { id: dto.employeeId, userId: null },
+          data: { userId: user.id },
+        });
+        if (linked.count === 0) throw DomainError.notFound();
+      }
+
       await writeAudit(tx, actor, {
         action: 'admin.user.create',
         entityType: 'User',
@@ -118,7 +126,8 @@ export class AdminUsersService {
         outletId: dto.outletIds[0] ?? null,
         after: { username: user.username, roleKey: user.roleKey, outletIds: dto.outletIds },
       });
-      return user;
+
+      return tx.user.findUniqueOrThrow({ where: { id: user.id }, include: USER_INCLUDE });
     });
 
     return { ...toView(created), temporaryPassword };

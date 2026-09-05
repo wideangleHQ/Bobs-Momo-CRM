@@ -1,40 +1,47 @@
 @import "tailwindcss";
 
-/* Warm, high contrast, readable on a cheap Android screen under kitchen
-   lighting. Every ratio here is checked against chapter 28. Components never
-   write a hex value; they use these semantic names. */
 @theme {
-  --color-bg:            #FAFAF9;
+  --color-bg:            #F8F8F7; /* Warm off-white */
   --color-surface:       #FFFFFF;
-  --color-surface-muted: #F5F5F4;
-  --color-text:          #1C1917;
-  --color-text-muted:    #57534E;
-  --color-border:        #E7E5E4;
-  --color-border-strong: #78716C;
-  --color-primary:       #C2410C;
+  --color-surface-muted: #FAFAF9;
+  --color-text:          #111827;
+  --color-text-muted:    #6B7280;
+  --color-border:        #F1F0EF;
+  --color-border-strong: #E4E3E1;
+
+  --color-primary:       #E63946; /* Bob's Momo Red */
   --color-primary-fg:    #FFFFFF;
-  --color-primary-bg:    #FFF1EA;
-  --color-success:       #15803D;
-  --color-success-bg:    #DCFCE7;
-  --color-warning:       #B45309;
-  --color-warning-bg:    #FEF3C7;
-  --color-danger:        #B91C1C;
-  --color-danger-bg:     #FEE2E2;
-  --color-info:          #0369A1;
-  --color-info-bg:       #E0F2FE;
+  --color-primary-bg:    #FFF1F2;
 
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --color-accent:        #FFD166; /* Bob's Momo Yellow */
+  --color-accent-fg:     #111827;
+  --color-accent-bg:     #FEF9C3;
 
-  --shadow-bar: 0 -1px 3px rgb(0 0 0 / 0.08);
+  --color-success:       #059669;
+  --color-success-bg:    #ECFDF5;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system,
-               "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-warning:       #D97706;
+  --color-warning-bg:    #FFFBEB;
+
+  --color-danger:        #E63946;
+  --color-danger-bg:     #FFF1F2;
+
+  --color-info:          #3B82F6;
+  --color-info-bg:       #EFF6FF;
+
+  /* radius-sm/md/lg map to rounded-sm/md/lg in Tailwind v4 */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.07), 0 4px 8px -4px rgb(0 0 0 / 0.03);
+
+  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 html {
-  /* A pinch zoom that overshoots on a 360px screen must not shrink the text. */
   -webkit-text-size-adjust: 100%;
 }
 
@@ -45,14 +52,11 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Never removed with outline:none. Chapter 28 accessibility baseline. */
 :focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-/* Wet fingers double tap. Highlighting the whole row on every tap reads as a
-   bug, so kill the flash and let the component own its pressed state. */
 * {
   -webkit-tap-highlight-color: transparent;
 }
@@ -62,8 +66,7 @@ body {
   body { background: #fff; }
 }
 
-/* Native <dialog> gives focus trapping, Escape and aria-modal for free, so
-   nothing here hand-rolls a modal. Only the backdrop needs painting. */
 dialog::backdrop {
-  background: rgb(0 0 0 / 0.45);
+  background: rgb(0 0 0 / 0.5);
 }
+

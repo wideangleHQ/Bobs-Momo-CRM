@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createItemSchema } from '@bobs-momo/shared';
 import { PageHeader } from '@/components/ui/page-header';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/ui/error-state';
 import { createItem, errorMessage } from '@/features/inventory/api';
 import { inventoryKeys } from '@/features/inventory/keys';
-import { useItemMaster } from '@/features/inventory/item-picker';
+import { adminKeys, listCategories, listUnits } from '@/features/admin/api';
 import { Field, FormError, SelectInput, TextInput } from '@/features/inventory/fields';
 
 /** "Chicken Mince" becomes "ITM-CHICKEN-MINCE", the convention in chapter 16. */
@@ -28,7 +28,9 @@ function skuFor(name: string): string {
 export default function NewItemPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const master = useItemMaster();
+
+  const categoriesQ = useQuery({ queryKey: adminKeys.categories(), queryFn: listCategories });
+  const unitsQ = useQuery({ queryKey: adminKeys.units(), queryFn: listUnits });
 
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
@@ -37,15 +39,8 @@ export default function NewItemPage() {
   const [unitId, setUnitId] = useState('');
   const [isPerishable, setIsPerishable] = useState(false);
 
-  const items = master.data ?? [];
-  // ponytail: no GET /inventory/categories or /inventory/units exists, so the
-  // pickers read the distinct values already present on the item master.
-  const categories = [...new Map(items.map((i) => [i.categoryId, i.categoryName])).entries()]
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const units = [...new Map(items.map((i) => [i.unitId, i.unitCode])).entries()]
-    .map(([value, label]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const categories = (categoriesQ.data?.data ?? []).map((c) => ({ value: c.id, label: c.name }));
+  const units = (unitsQ.data?.data ?? []).map((u) => ({ value: u.id, label: u.code }));
 
   const effectiveSku = skuTouched ? sku : skuFor(name);
   const draft = { name: name.trim(), sku: effectiveSku, categoryId, unitId, isPerishable };
@@ -61,13 +56,17 @@ export default function NewItemPage() {
     },
   });
 
-  if (master.isPending) {
+  if (categoriesQ.isPending || unitsQ.isPending) {
     return <Skeleton className="m-4 h-96 rounded-lg" />;
   }
-  if (master.isError) {
+  if (categoriesQ.isError || unitsQ.isError) {
+    const err = categoriesQ.error ?? unitsQ.error;
     return (
       <div className="p-4">
-        <ErrorState message={errorMessage(master.error)} onRetry={() => void master.refetch()} />
+        <ErrorState message={errorMessage(err)} onRetry={() => {
+          void categoriesQ.refetch();
+          void unitsQ.refetch();
+        }} />
       </div>
     );
   }

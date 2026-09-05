@@ -57,6 +57,7 @@ export const createUserSchema = z
     email: emailSchema.optional(),
     roleKey: z.enum(ROLE_KEYS),
     outletIds: z.array(uuidSchema).max(20).default([]),
+    employeeId: uuidSchema.nullable().optional(),
   })
   .strict()
   .refine((o) => ALL_OUTLET_ROLE_KEYS.includes(o.roleKey) || o.outletIds.length > 0, {

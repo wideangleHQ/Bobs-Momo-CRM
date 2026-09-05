@@ -8,12 +8,12 @@ export type BadgeVariant = BadgeTone | 'secondary';
 type BadgeVariantInput = BadgeVariant | (string & {});
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-surface-muted text-text-muted',
-  success: 'bg-success-bg text-success',
-  warning: 'bg-warning-bg text-warning',
-  danger: 'bg-danger-bg text-danger',
-  info: 'bg-info-bg text-info',
-  primary: 'bg-primary-bg text-primary',
+  neutral: 'bg-zinc-100 text-zinc-700 border border-zinc-200',
+  success: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold',
+  warning: 'bg-amber-50 text-amber-800 border border-amber-200 font-semibold',
+  danger: 'bg-red-50 text-red-700 border border-red-200 font-semibold',
+  info: 'bg-zinc-800 text-zinc-50 font-medium',
+  primary: 'bg-red-600 text-white font-semibold',
 };
 
 /** Colour is never the only signal, so the label always carries the meaning. */
@@ -33,7 +33,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center rounded-md px-2 py-0.5 text-xs font-semibold uppercase tracking-wider',
         TONES[picked],
         className,
       )}
@@ -42,3 +42,4 @@ export function Badge({
     </span>
   );
 }
+

@@ -9,11 +9,12 @@ import { useEffect, useRef, useState } from 'react';
 // maths, not money maths. Every figure a human reads is formatted through
 // lib/format by the caller and passed in as `formatValue`.
 
-export const SERIES_COLORS = ['#0f766e', '#c2410c', '#4338ca', '#a16207', '#be123c'] as const;
+export const SERIES_COLORS = ['#dc2626', '#18181b', '#ca8a04', '#52525b', '#991b1b'] as const;
 
 export function seriesColor(index: number): string {
-  return SERIES_COLORS[index % SERIES_COLORS.length] ?? '#0f766e';
+  return SERIES_COLORS[index % SERIES_COLORS.length] ?? '#dc2626';
 }
+
 
 /** Container width in CSS pixels, so text stays the same size at every width. */
 export function useMeasuredWidth(): [React.RefObject<HTMLDivElement | null>, number] {

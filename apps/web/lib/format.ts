@@ -11,11 +11,11 @@ const inr = new Intl.NumberFormat('en-IN', {
   maximumFractionDigits: 2,
 });
 
-/** "4427.5" -> "Rs 4,427.50". Indian grouping, two decimals, always. */
+/** "4427.5" -> "₹4,427.50". Indian grouping, two decimals, always. */
 export function money(value: string | number): string {
   const n = typeof value === 'string' ? Number(value) : value;
-  if (!Number.isFinite(n)) return 'Rs 0.00';
-  return `Rs ${inr.format(n)}`;
+  if (!Number.isFinite(n)) return '₹0.00';
+  return `₹${inr.format(n)}`;
 }
 
 /** "15" -> "15.000", with the unit appended when one is given. */

@@ -49,18 +49,23 @@ export function setAuthLostHandler(fn: () => void): void {
  */
 export function refreshOnce(): Promise<boolean> {
   refreshInFlight ??= (async () => {
-    const res = await fetch(`${BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      // The API rejects a refresh without this header. A cross-site form post
-      // cannot set it, which is what stops CSRF on the cookie.
-      headers: { 'x-refresh-request': '1' },
-    });
-    if (!res.ok) return false;
-    const body = (await res.json()) as { accessToken?: string };
-    if (!body.accessToken) return false;
-    accessToken = body.accessToken;
-    return true;
+    try {
+      const res = await fetch(`${BASE}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        // The API rejects a refresh without this header. A cross-site form post
+        // cannot set it, which is what stops CSRF on the cookie.
+        headers: { 'x-refresh-request': '1' },
+      });
+      if (!res.ok) return false;
+      const body = (await res.json()) as { accessToken?: string };
+      if (!body.accessToken) return false;
+      accessToken = body.accessToken;
+      return true;
+    } catch {
+      // Gracefully handle network/CORS failures when the API is unavailable
+      return false;
+    }
   })().finally(() => {
     // Cleared in finally, so every waiter latched on before settlement shares
     // the same result rather than starting a second refresh.

@@ -67,7 +67,7 @@ export function OutletSwitcher() {
             // Storage off. The choice still applies for this page view.
           }
         }}
-        className="h-11 w-40 text-sm"
+        className="h-9 w-40 text-xs font-semibold"
       >
         {user.scope === 'ALL_OUTLETS' ? <option value="">All outlets</option> : null}
         {user.outletIds.map((id, i) => (
@@ -79,3 +79,4 @@ export function OutletSwitcher() {
     </>
   );
 }
+

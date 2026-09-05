@@ -4,7 +4,10 @@ import { cn } from '@/lib/cn';
 export function Card({ className, ...rest }: ComponentPropsWithRef<'div'>) {
   return (
     <div
-      className={cn('rounded-lg border border-border bg-surface shadow-sm', className)}
+      className={cn(
+        'rounded-2xl border border-zinc-100 bg-white shadow-sm transition-shadow hover:shadow-md',
+        className,
+      )}
       {...rest}
     />
   );
@@ -20,13 +23,14 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('flex items-center justify-between gap-3 border-b border-border p-4', className)}>
-      <h2 className="text-base font-semibold text-text">{title}</h2>
+    <div className={cn('flex items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4', className)}>
+      <h2 className="text-sm font-semibold text-zinc-900">{title}</h2>
       {action}
     </div>
   );
 }
 
 export function CardBody({ className, ...rest }: ComponentPropsWithRef<'div'>) {
-  return <div className={cn('p-4 sm:p-6', className)} {...rest} />;
+  return <div className={cn('p-5', className)} {...rest} />;
 }
+

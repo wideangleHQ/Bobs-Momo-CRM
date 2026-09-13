@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --port 3000",
     "dev:turbo": "next dev --turbopack --port 3000",
-    "build": "node ./node_modules/next/dist/bin/next build",
+    "build": "bun run --cwd ../../packages/shared build && node ./node_modules/next/dist/bin/next build",
     "start": "next start --port 3000",
     "lint": "eslint app components lib --max-warnings 0",
     "typecheck": "tsc --noEmit"

@@ -47,7 +47,7 @@ export const NAV_ITEMS: NavItem[] = [
     permission: 'purchase.request.read',
     icon: 'cart',
   },
-  { href: '/vendors', label: 'Vendors', permission: 'vendor.vendor.read', icon: 'truck' },
+  { href: '/vendors', label: 'Suppliers', permission: 'vendor.vendor.read', icon: 'truck' },
 
   // Money
   { href: '/sales', label: 'Sales', permission: 'sales.entry.read', icon: 'rupee' },

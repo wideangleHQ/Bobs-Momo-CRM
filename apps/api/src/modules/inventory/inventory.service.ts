@@ -128,13 +128,29 @@ export class InventoryService {
   }
 
   async createItem(dto: CreateItemDto) {
-    const existing = await this.repo.findItemBySku(dto.sku);
-    if (existing) {
-      throw DomainError.conflict(ERROR_CODES.COMMON_CONFLICT, 'That SKU already exists', {
-        sku: dto.sku,
-      });
+    let sku = dto.sku;
+    if (!sku) {
+      const slug = dto.name
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 30);
+      const base = `ITM-${slug || 'ITEM'}`;
+      sku = base;
+      let counter = 1;
+      while (await this.repo.findItemBySku(sku)) {
+        sku = `${base}-${counter}`;
+        counter++;
+      }
+    } else {
+      const existing = await this.repo.findItemBySku(sku);
+      if (existing) {
+        throw DomainError.conflict(ERROR_CODES.COMMON_CONFLICT, 'That SKU already exists', {
+          sku: dto.sku,
+        });
+      }
     }
-    const created = await this.repo.createItem(dto);
+    const created = await this.repo.createItem({ ...dto, sku });
     return this.getItem(created.id);
   }
 

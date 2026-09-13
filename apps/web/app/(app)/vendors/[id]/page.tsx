@@ -195,7 +195,17 @@ export default function VendorDetailPage() {
       <PageHeader
         title={v.name}
         description={`${v.itemIds.length} linked items`}
-        action={v.isActive ? null : <StatusPill status="CANCELLED" />}
+        action={
+          v.isActive ? (
+            can('purchase.record.create') || can('inventory.transaction.create') ? (
+              <Link href={`/inventory/receive?vendorId=${v.id}`}>
+                <Button>Receive Stock</Button>
+              </Link>
+            ) : null
+          ) : (
+            <StatusPill status="CANCELLED" />
+          )
+        }
       />
 
       {v.isActive ? null : (

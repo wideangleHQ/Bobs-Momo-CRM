@@ -3,8 +3,8 @@ import { money, qty, shortDate, longDate, time, relative, duration } from './for
 import { apiGet, ApiError, errorMessage, setAccessToken } from './api';
 
 test('money uses Indian grouping and two decimals', () => {
-  expect(money('4427.5')).toBe('Rs 4,427.50');
-  expect(money(123456.78)).toBe('Rs 1,23,456.78');
+  expect(money('4427.5')).toBe('₹4,427.50');
+  expect(money(123456.78)).toBe('₹1,23,456.78');
 });
 
 test('quantity pads to three decimals and takes a unit', () => {

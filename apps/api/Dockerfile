@@ -1,28 +1,40 @@
-# Node, not Bun, in production. ADR-002: NestJS decorator metadata and the
-# Prisma query engine binary are not where you want a surprise on day 16 of a
-# three week build. Bun still runs install and the test suite.
-FROM node:22-slim AS base
+# Node, not Bun, in production runtime. ADR-002: NestJS decorator metadata and the
+# Prisma query engine binary run under Node 22 LTS in production.
+# Bun is used for multi-stage dependency installation and builds to support Bun monorepo workspace:* dependencies.
+
+FROM oven/bun:1-slim AS deps
+WORKDIR /app
+# Prisma and native dependencies need OpenSSL and CA certs
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json bun.lock ./
+COPY apps/api/package.json apps/api/
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json apps/web/
+RUN bun install --frozen-lockfile
+
+FROM oven/bun:1-slim AS build
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+COPY . .
+RUN bun run --cwd apps/api db:generate \
+    && bun run shared:build \
+    && bun run --cwd apps/api build
+
+FROM node:22-slim AS runtime
 WORKDIR /app
 # Prisma needs OpenSSL to pick its engine at runtime.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS deps
-COPY package.json bun.lock ./
-COPY apps/api/package.json apps/api/
-COPY packages/shared/package.json packages/shared/
-RUN npm install --workspaces --include-workspace-root --no-audit --no-fund
-
-FROM base AS build
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-COPY . .
-RUN npx --workspace @bobs-momo/api prisma generate \
-    && npm run shared:build \
-    && npm run --workspace @bobs-momo/api build
-
-FROM base AS runtime
 ENV NODE_ENV=production TZ=Asia/Kolkata
+ENV PATH="/app/node_modules/.bin:/app/apps/api/node_modules/.bin:$PATH"
+
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
@@ -40,4 +52,4 @@ EXPOSE 3001
 # release phase. migrate deploy is idempotent and applies only pending files,
 # so a restart is safe. It uses DIRECT_URL: prisma migrate cannot run through
 # the Supavisor transaction pooler.
-CMD ["sh", "-c", "npx --workspace @bobs-momo/api prisma migrate deploy && node apps/api/dist/main"]
+CMD ["sh", "-c", "prisma migrate deploy --schema=apps/api/prisma/schema.prisma && node apps/api/dist/main"]

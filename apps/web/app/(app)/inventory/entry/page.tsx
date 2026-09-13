@@ -35,11 +35,10 @@ import {
 import { addQty, cmpQty } from '@/features/purchase/decimal';
 
 const TYPES: { value: TxnType; label: string; sign: -1 | 0 | 1; permission?: string }[] = [
-  { value: 'RECEIVED', label: 'Received', sign: 1 },
-  { value: 'ISSUED', label: 'Issued to kitchen', sign: -1 },
-  { value: 'WASTAGE', label: 'Wastage', sign: -1 },
-  { value: 'OPENING', label: 'Opening', sign: 1 },
-  { value: 'ADJUSTMENT', label: 'Adjustment', sign: 0, permission: 'inventory.adjustment.create' },
+  { value: 'ISSUED', label: 'Send to kitchen', sign: -1 },
+  { value: 'WASTAGE', label: 'Record wastage', sign: -1 },
+  { value: 'OPENING', label: 'Add opening stock', sign: 1 },
+  { value: 'ADJUSTMENT', label: 'Fix stock difference', sign: 0, permission: 'inventory.adjustment.create' },
 ];
 
 // Chips keep the wastage report groupable instead of 400 spellings of "spoilt".
@@ -219,7 +218,7 @@ export default function StockEntryPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[560px] flex-col gap-4 p-4 pb-40">
-      <PageHeader title="Record stock" description="Received, issued, wastage or an adjustment." />
+      <PageHeader title="Stock movement" description="Issue to kitchen, record wastage, fix a stock difference." />
 
       <fieldset disabled={busy} className="flex flex-col gap-4">
         {outletOptions.length > 1 ? (
@@ -233,7 +232,7 @@ export default function StockEntryPage() {
           </Field>
         ) : null}
 
-        <Field label="Transaction type">
+        <Field label="What are you recording?">
           <div className="grid grid-cols-2 gap-2">
             {TYPES.filter((t) => !t.permission || can(t.permission)).map((t) => (
               <button

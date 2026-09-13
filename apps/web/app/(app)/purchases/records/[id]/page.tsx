@@ -127,6 +127,19 @@ export default function PurchaseDetailPage() {
         </div>
       </div>
 
+      <div className="flex gap-2">
+        <Link href={`/vendors/${p.vendorId}`} className="flex-1">
+          <Button variant="secondary" size="sm" fullWidth>
+            View Supplier
+          </Button>
+        </Link>
+        <Link href={`/inventory/history?from=${p.purchaseDate}&to=${p.purchaseDate}`} className="flex-1">
+          <Button variant="secondary" size="sm" fullWidth>
+            View Stock History
+          </Button>
+        </Link>
+      </div>
+
       {p.requestId ? (
         <Link href={`/purchases/requests/${p.requestId}`} className="text-sm underline">
           Raised from a purchase request

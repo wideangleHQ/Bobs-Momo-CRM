@@ -96,7 +96,14 @@ export const createPurchaseSchema = z
     taxAmount: moneySchema.default(0),
     note: z.string().trim().max(500).optional(),
     lines: z
-      .array(z.object({ itemId: uuidSchema, quantity: qtySchema, unitPrice: moneySchema }))
+      .array(
+        z.object({
+          itemId: uuidSchema,
+          quantity: qtySchema,
+          unitPrice: moneySchema,
+          taxRate: z.coerce.number().min(0).max(100).optional(),
+        }),
+      )
       .min(1)
       .max(60),
   })

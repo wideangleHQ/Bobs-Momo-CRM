@@ -7,7 +7,7 @@
   ],
   "scripts": {
     "dev": "bun run shared:build && bun run --filter '@bobs-momo/api' --filter '@bobs-momo/web' dev",
-    "build": "bun run shared:build && bun run --filter '@bobs-momo/api' --filter '@bobs-momo/web' build",
+    "build": "bun run shared:build && bun run --cwd apps/api build && bun run --cwd apps/web build",
     "shared:build": "bun run --cwd packages/shared build",
     "lint": "eslint .",
     "typecheck": "bun run shared:build && bun run --filter '*' typecheck",

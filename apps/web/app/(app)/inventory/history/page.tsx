@@ -32,7 +32,17 @@ const TYPES: AnyTxnType[] = [
   'CLOSING',
 ];
 
-const label = (t: string) => t.replace('_', ' ').toLowerCase();
+const TXN_LABELS: Record<string, string> = {
+  RECEIVED: 'Received from supplier',
+  ISSUED: 'Sent to kitchen',
+  WASTAGE: 'Wastage',
+  ADJUSTMENT: 'Stock difference fixed',
+  OPENING: 'Opening stock',
+  TRANSFER_OUT: 'Sent to another store',
+  TRANSFER_IN: 'Received from another store',
+  CLOSING: 'Closing stock',
+};
+const label = (t: string) => TXN_LABELS[t] ?? t.replace('_', ' ').toLowerCase();
 
 export default function StockLedgerPage() {
   const master = useItemMaster();
@@ -67,7 +77,7 @@ export default function StockLedgerPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-4">
       <PageHeader
-        title="Stock ledger"
+        title="Stock History"
         description="Every movement, with the balance it left behind."
       />
 
@@ -120,7 +130,7 @@ export default function StockLedgerPage() {
               setPage(1);
             }}
             placeholder="All types"
-            options={TYPES.map((t) => ({ value: t, label: label(t) }))}
+            options={TYPES.map((t) => ({ value: t, label: TXN_LABELS[t] ?? label(t) }))}
           />
         </Field>
         {outletOptions.length > 1 ? (

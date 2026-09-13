@@ -78,7 +78,8 @@ export const createItemSchema = z
     sku: z
       .string()
       .trim()
-      .regex(/^ITM-[A-Z0-9-]{2,40}$/, 'SKU looks like ITM-CHICKEN-MINCE'),
+      .regex(/^ITM-[A-Z0-9-]{2,40}$/, 'SKU looks like ITM-CHICKEN-MINCE')
+      .optional(),
     name: z.string().trim().min(2).max(120),
     categoryId: uuidSchema,
     unitId: uuidSchema,

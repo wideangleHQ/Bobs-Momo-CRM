@@ -43,6 +43,15 @@ const PATHS: Record<string, string> = {
   trendUp: 'M22 7 13.5 15.5l-5-5L2 17M22 7h-7m7 0v7',
   package: 'M20.5 7.5 12 3 3.5 7.5v9L12 21l8.5-4.5v-9ZM3.5 7.5 12 12m0 0 8.5-4.5M12 12v9',
   warning: 'M12 8.5v5m0 3.5v.01M10.3 3.9 2.5 18a1.5 1.5 0 0 0 1.3 2.2h16.4A1.5 1.5 0 0 0 21.5 18L13.7 3.9a1.5 1.5 0 0 0-2.6 0Z',
+  warehouse: 'M3 21V9l9-6 9 6v12H3ZM9 21v-6h6v6M9 9h6',
+  receipt: 'M4 2v20l3-2 3 2 3-2 3 2 3-2 3 2V2l-3 2-3-2-3 2-3-2-3 2-3-2ZM8 8h8M8 12h8M8 16h5',
+  building: 'M3 21h18M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1',
+  history: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M12 7v5l4 2',
+  arrowUpRight: 'M7 17 17 7M7 7h10v10',
+  layers: 'm12 2 10 5-10 5L2 7l10-5ZM2 12l10 5 10-5M2 17l10 5 10-5',
+  sparkles: 'm12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z',
+  clipboard: 'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
 };
 
 export type IconName = keyof typeof PATHS;

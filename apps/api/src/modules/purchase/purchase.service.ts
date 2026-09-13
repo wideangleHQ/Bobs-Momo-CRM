@@ -147,7 +147,14 @@ export class PurchaseService {
       return { ...l, quantity, unitPrice, lineTotal: quantity.mul(unitPrice).toDecimalPlaces(2) };
     });
     const subtotal = lines.reduce((acc, l) => acc.plus(l.lineTotal), new Decimal(0));
-    const taxAmount = new Decimal(dto.taxAmount.toFixed(2));
+    const hasLineTaxes = lines.some((l) => l.taxRate !== undefined && l.taxRate > 0);
+    const computedLineTax = hasLineTaxes
+      ? lines.reduce((acc, l) => {
+          const rate = new Decimal(l.taxRate ?? 0).div(100);
+          return acc.plus(l.lineTotal.mul(rate).toDecimalPlaces(2));
+        }, new Decimal(0))
+      : null;
+    const taxAmount = computedLineTax !== null ? computedLineTax : new Decimal(dto.taxAmount.toFixed(2));
     const totalAmount = subtotal.plus(taxAmount);
 
     const priceWarnings = await this.buildPriceWarnings(lines);
@@ -209,7 +216,7 @@ export class PurchaseService {
             businessDate: dto.purchaseDate,
             sourceType: 'PURCHASE',
             sourceId: purchase.id,
-            note: `${purchaseNo} from ${vendor.name}`,
+            note: dto.note ? `${purchaseNo} from ${vendor.name} · ${dto.note}` : `${purchaseNo} from ${vendor.name}`,
           },
           user.sub,
         );

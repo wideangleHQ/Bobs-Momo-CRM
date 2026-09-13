@@ -48,7 +48,7 @@ export default function ItemsPage() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-4">
       <PageHeader
-        title="Item master"
+        title="Manage Items"
         description="Every ingredient and packaging item you track."
         action={
           can('inventory.item.create') ? (

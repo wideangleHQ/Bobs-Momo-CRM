@@ -95,6 +95,25 @@ export const listItems = (p: ListItemsParams = {}) =>
 
 export const getItem = (id: string) => apiGet<Item>(`/inventory/items/${id}`);
 
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface Unit {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export const listCategories = () => apiGet<{ data: Category[] }>('/inventory/categories');
+export const createCategory = (body: { name: string }) =>
+  apiPost<Category>('/inventory/categories', body);
+
+export const listUnits = () => apiGet<{ data: Unit[] }>('/inventory/units');
+export const createUnit = (body: { code: string; name: string }) =>
+  apiPost<Unit>('/inventory/units', body);
+
 export const createItem = (body: unknown) => apiPost<Item>('/inventory/items', body);
 
 export const updateItem = (id: string, body: unknown) =>

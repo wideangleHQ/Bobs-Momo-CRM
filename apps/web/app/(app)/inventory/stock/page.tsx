@@ -18,15 +18,17 @@ import { useItemMaster } from '@/features/inventory/item-picker';
 import { Chip, SelectInput, TextInput, useDebounced } from "@/features/inventory/fields";
 import { useOutlets } from '@/features/inventory/outlets';
 
-function StockLine({ row }: { row: StockRow }) {
+function StockLine({ row, canReceive }: { row: StockRow; canReceive: boolean }) {
   const flagged = row.isNegative || row.isBelowReorder;
   return (
-    <li>
+    <li
+      className={`flex items-center gap-2 border-l-4 bg-surface px-3 py-2 ${
+        flagged ? 'border-l-danger' : 'border-l-transparent'
+      }`}
+    >
       <Link
         href={`/inventory/items/${row.itemId}`}
-        className={`flex min-h-[64px] flex-col justify-center gap-0.5 border-l-4 bg-surface px-3 py-2 ${
-          flagged ? 'border-l-danger' : 'border-l-transparent'
-        }`}
+        className="flex min-h-[64px] flex-1 flex-col justify-center gap-0.5"
       >
         <span className="flex items-center gap-2">
           {flagged ? (
@@ -56,6 +58,14 @@ function StockLine({ row }: { row: StockRow }) {
           </span>
         </span>
       </Link>
+      {flagged && canReceive ? (
+        <Link
+          href={`/inventory/receive?itemId=${row.itemId}`}
+          className="min-h-[44px] shrink-0 self-center whitespace-nowrap rounded-lg border border-border px-3 text-sm font-medium text-primary"
+        >
+          Receive Stock
+        </Link>
+      ) : null}
     </li>
   );
 }
@@ -102,10 +112,14 @@ function StockList() {
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 p-4">
       <PageHeader
-        title="Current stock"
+        title="Check Stock"
         description="What is on hand at this outlet right now."
         action={
-          can('inventory.transaction.create') ? (
+          can('purchase.record.create') || can('inventory.transaction.create') ? (
+            <Link href="/inventory/receive">
+              <Button>Record New Stock</Button>
+            </Link>
+          ) : can('inventory.transaction.create') ? (
             <Link href="/inventory/entry">
               <Button>Record stock</Button>
             </Link>
@@ -186,11 +200,11 @@ function StockList() {
         ) : (
           <EmptyState
             title="No stock recorded yet"
-            description="Record an opening or received entry and the balance shows up here."
+            description="Receive stock from a supplier and the balance shows up here."
             action={
-              can('inventory.transaction.create') ? (
-                <Link href="/inventory/entry">
-                  <Button>Record stock</Button>
+              can('purchase.record.create') || can('inventory.transaction.create') ? (
+                <Link href="/inventory/receive">
+                  <Button>Record New Stock</Button>
                 </Link>
               ) : null
             }
@@ -204,7 +218,11 @@ function StockList() {
             }`}
           >
             {stock.data.data.map((row) => (
-              <StockLine key={`${row.itemId}:${row.outletId}`} row={row} />
+              <StockLine
+                key={`${row.itemId}:${row.outletId}`}
+                row={row}
+                canReceive={can('purchase.record.create') || can('inventory.transaction.create')}
+              />
             ))}
           </ul>
           <Pagination

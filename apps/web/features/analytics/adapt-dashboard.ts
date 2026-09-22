@@ -93,7 +93,14 @@ export function adaptDashboard(raw: unknown): DashboardResponse {
   }
 
   const lowStock = t['lowStock'];
-  if (lowStock) out.lowStock = { count: num(lowStock['count']) ?? 0 };
+  if (lowStock) {
+    out.lowStock = {
+      count: num(lowStock['count']) ?? 0,
+      items: Array.isArray(lowStock['items'])
+        ? (lowStock['items'] as NonNullable<DashboardResponse['lowStock']>['items'])
+        : undefined,
+    };
+  }
 
   const overdue = t['overdueTasks'];
   if (overdue) {
@@ -109,7 +116,8 @@ export function adaptDashboard(raw: unknown): DashboardResponse {
   const checklists = t['checklistsDueToday'];
   if (checklists) out.checklistsDueToday = { count: num(checklists['count']) ?? 0 };
 
-  const wastage = t['wastageValueMtd'];
+  // owner sends wastageValueMtd; outlet/functional variants send wastageThisWeek
+  const wastage = t['wastageValueMtd'] ?? t['wastageThisWeek'];
   if (wastage) out.wastage = { value: str(wastage['value']) ?? '0.00' };
 
   const approvals = t['pendingApprovals'];

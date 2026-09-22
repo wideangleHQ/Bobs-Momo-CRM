@@ -1070,13 +1070,32 @@ export class AnalyticsService {
         item: { isActive: true },
         ...lowStockWhere(this.prisma),
       },
-      select: { outlet: { select: { code: true } } },
+      select: {
+        itemId: true,
+        qtyOnHand: true,
+        reorderLevel: true,
+        item: { select: { name: true, unit: { select: { code: true } } } },
+        outlet: { select: { code: true } },
+      },
+      orderBy: [{ outlet: { code: 'asc' } }, { item: { name: 'asc' } }],
     });
     const byOutlet: Record<string, number> = {};
     for (const row of below) {
       byOutlet[row.outlet.code] = (byOutlet[row.outlet.code] ?? 0) + 1;
     }
-    return { count: below.length, byOutlet };
+    return {
+      count: below.length,
+      byOutlet,
+      items: below.map((row) => ({
+        itemId: row.itemId,
+        itemName: row.item.name,
+        outletCode: row.outlet.code,
+        qtyOnHand: row.qtyOnHand.toFixed(3),
+        // reorderLevel is guaranteed non-null by lowStockWhere({ reorderLevel: { not: null } })
+        reorderLevel: row.reorderLevel!.toFixed(3),
+        unitCode: row.item.unit.code,
+      })),
+    };
   }
 
   private async taskCounts(outletIds: string[]) {

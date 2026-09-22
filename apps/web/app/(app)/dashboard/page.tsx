@@ -475,7 +475,7 @@ export default function DashboardPage() {
               )}
 
               {/* Suppliers */}
-              {can('vendor.read') && (
+              {can('vendor.vendor.read') && (
                 <ActionCard
                   title="Suppliers"
                   description="Manage vendor details, phone numbers, and GSTIN."
@@ -610,7 +610,7 @@ export default function DashboardPage() {
                   iconBg={data.overdueTasks.count > 0 ? 'bg-red-100' : 'bg-emerald-50'}
                   iconColor={data.overdueTasks.count > 0 ? 'text-red-600' : 'text-emerald-600'}
                   alert={data.overdueTasks.count > 0}
-                  link={can('tasks.read') ? '/tasks' : undefined}
+                  link={can('task.task.read') ? '/tasks' : undefined}
                   linkLabel="View"
                 />
               ) : null}
@@ -642,7 +642,7 @@ export default function DashboardPage() {
                   alert={
                     (data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0
                   }
-                  link={can('purchases.requests.read') ? '/purchases/requests' : undefined}
+                  link={can('purchase.request.read') ? '/purchases/requests' : undefined}
                   linkLabel="Review"
                 />
               ) : null}

@@ -57,7 +57,7 @@ export default function GrossMarginReportPage() {
         'days_with_entry',
       ],
       data.rows.map((row) => [
-        row.code,
+        row.outletCode,
         range.from,
         range.to,
         row.netSales,
@@ -105,9 +105,9 @@ export default function GrossMarginReportPage() {
           return (
             <div className="space-y-4">
               {data.rows.map((row) => (
-                <Card key={row.id} className="overflow-hidden">
+                <Card key={row.outletId} className="overflow-hidden">
                   <div className="border-b border-border px-3 py-2">
-                    <h2 className="font-semibold text-text">{row.code}</h2>
+                    <h2 className="font-semibold text-text">{row.outletCode}</h2>
                   </div>
 
                   {/* The caveat sits beside the figure at the same size, not under it. */}
@@ -172,7 +172,7 @@ export default function GrossMarginReportPage() {
                 <BarChart
                   title="Net sales and recorded purchases per outlet"
                   rows={data.rows.map((row) => ({
-                    label: row.code,
+                    label: row.outletCode,
                     values: {
                       sales: num(row.netSales),
                       purchases: num(row.purchaseCost),
@@ -196,9 +196,9 @@ export default function GrossMarginReportPage() {
               <ReportTable<PnlRow>
                 caption="Margin per outlet"
                 rows={data.rows}
-                rowKey={(row) => row.id}
+                rowKey={(row) => row.outletId}
                 columns={[
-                  { key: 'code', header: 'Outlet', cell: (row) => row.code },
+                  { key: 'code', header: 'Outlet', cell: (row) => row.outletCode },
                   {
                     key: 'net',
                     header: 'Net sales',

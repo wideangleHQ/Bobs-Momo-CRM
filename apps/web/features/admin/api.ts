@@ -120,10 +120,10 @@ export const listOutlets = () => apiGet<{ data: Outlet[] }>('/outlets');
 export const createOutlet = (body: { code: string; name: string; address?: string }) =>
   apiPost<Outlet>('/outlets', body);
 
-export const listDepartments = () => apiGet<{ data: Department[] }>('/departments');
+export const listDepartments = () => apiGet<{ data: Department[] }>('/admin/departments');
 
 export const createDepartment = (outletId: string, body: { name: string }) =>
-  apiPost<Department>(`/outlets/${outletId}/departments`, body);
+  apiPost<Department>('/admin/departments', { ...body, outletId });
 
 export const listCategories = () => apiGet<{ data: Category[] }>('/inventory/categories');
 

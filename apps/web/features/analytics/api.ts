@@ -38,7 +38,8 @@ export const fetchWaste = (f: ReportRange & { categoryId?: string; groupBy?: str
 export const fetchPerformance = (f: ReportRange) =>
   apiGet<PerformanceResponse>(`/analytics/performance${qs({ ...f })}`);
 
-export const fetchPnl = (f: ReportRange) => apiGet<PnlResponse>(`/analytics/pnl${qs({ ...f })}`);
+export const fetchPnl = (f: ReportRange) =>
+  apiGet<PnlResponse>(`/analytics/gross-margin${qs({ ...f })}`);
 
 export const fetchPriceHistory = (f: ReportRange & { itemId?: string; vendorId?: string }) =>
   apiGet<PriceHistoryResponse>(

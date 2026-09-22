@@ -166,8 +166,8 @@ export interface PerformanceResponse {
 }
 
 export interface PnlRow {
-  id: string;
-  code: string;
+  outletId: string;
+  outletCode: string;
   netSales: Decimal;
   purchaseCost: Decimal;
   grossMarginApprox: Decimal;

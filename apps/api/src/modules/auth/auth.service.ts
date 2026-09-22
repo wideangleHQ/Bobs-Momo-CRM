@@ -93,14 +93,28 @@ export class AuthService {
     }
 
     const familyId = randomUUID();
-    const issued = await this.prisma.$transaction(async (tx) => {
-      await this.repo.recordSuccessfulLogin(tx, user.id);
-      const pair = await this.issuePair(tx, user, familyId, ctx);
-      await this.repo.writeAudit(tx, this.auditRow(user, 'auth.session.create', ctx));
-      return pair;
-    });
+    // Prepare JWT and refresh token outside the transaction — JWT signing and
+    // outlet-cache resolution are CPU/network work that must not hold a DB
+    // connection open (Prisma's default 5s interactive-transaction timeout).
+    const prepared = await this.prepareTokenPair(user, familyId);
 
-    return { ...issued, user: await this.profile(user) };
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.repo.recordSuccessfulLogin(tx, user.id);
+        await this.repo.createRefreshToken(tx, {
+          userId: user.id,
+          tokenHash: prepared.tokenHash,
+          familyId,
+          expiresAt: prepared.expiresAt,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+        await this.repo.writeAudit(tx, this.auditRow(user, 'auth.session.create', ctx));
+      },
+      { maxWait: 10000, timeout: 15000 },
+    );
+
+    return { ...prepared.pair, user: await this.profile(user) };
   }
 
   async refresh(presented: string, ctx: RequestCtx): Promise<TokenPair> {
@@ -144,13 +158,25 @@ export class AuthService {
       );
     }
 
-    const issued = await this.prisma.$transaction(async (tx) => {
-      await this.repo.revokeToken(tx, row.id);
-      return this.issuePair(tx, user, row.familyId, ctx);
-    });
+    const prepared = await this.prepareTokenPair(user, row.familyId);
 
-    await this.redis.set(`auth:rot:${tokenHash}`, issued, ROTATION_REPLAY_SECONDS);
-    return issued;
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.repo.revokeToken(tx, row.id);
+        await this.repo.createRefreshToken(tx, {
+          userId: user.id,
+          tokenHash: prepared.tokenHash,
+          familyId: row.familyId,
+          expiresAt: prepared.expiresAt,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      },
+      { maxWait: 10000, timeout: 15000 },
+    );
+
+    await this.redis.set(`auth:rot:${tokenHash}`, prepared.pair, ROTATION_REPLAY_SECONDS);
+    return prepared.pair;
   }
 
   /** Idempotent. A second call with no cookie still succeeds. */
@@ -197,15 +223,28 @@ export class AuthService {
 
     const hash = await this.passwords.hash(dto.newPassword);
     const familyId = randomUUID();
+    // A fresh session so the user is not bounced to login the moment they set a
+    // password. Prepare outside the transaction for the same reason as login().
+    const prepared = await this.prepareTokenPair({ ...user, mustReset: false }, familyId);
 
-    return this.prisma.$transaction(async (tx) => {
-      await this.repo.setPassword(tx, user.id, hash, false);
-      await this.repo.revokeAllForUser(tx, user.id);
-      await this.repo.writeAudit(tx, this.auditRow(user, 'auth.password.change', ctx));
-      // A fresh session, so the user is not bounced to login the moment they
-      // set a password.
-      return this.issuePair(tx, { ...user, mustReset: false }, familyId, ctx);
-    });
+    await this.prisma.$transaction(
+      async (tx) => {
+        await this.repo.setPassword(tx, user.id, hash, false);
+        await this.repo.revokeAllForUser(tx, user.id);
+        await this.repo.writeAudit(tx, this.auditRow(user, 'auth.password.change', ctx));
+        await this.repo.createRefreshToken(tx, {
+          userId: user.id,
+          tokenHash: prepared.tokenHash,
+          familyId,
+          expiresAt: prepared.expiresAt,
+          ip: ctx.ip,
+          userAgent: ctx.userAgent,
+        });
+      },
+      { maxWait: 10000, timeout: 15000 },
+    );
+
+    return prepared.pair;
   }
 
   async adminReset(dto: AdminResetDto, actor: AuthedUser, allowedOutletIds: string[], ctx: RequestCtx) {
@@ -281,12 +320,10 @@ export class AuthService {
     return { outletIds: user.outlets.map((o) => o.outletId), scope: 'OWN_OUTLET' };
   }
 
-  private async issuePair(
-    tx: Prisma.TransactionClient,
+  private async prepareTokenPair(
     user: UserWithScope,
     familyId: string,
-    ctx: RequestCtx,
-  ): Promise<TokenPair> {
+  ): Promise<{ pair: TokenPair; tokenHash: string; expiresAt: Date }> {
     const { outletIds, scope } = await this.resolveScope(user);
     const accessToken = await this.tokens.signAccess({
       sub: user.id,
@@ -297,22 +334,11 @@ export class AuthService {
       permHash: PERMISSION_HASHES[user.roleKey] ?? '',
       mustReset: user.mustReset,
     });
-
     const { token, tokenHash } = this.tokens.newRefreshToken();
-    await this.repo.createRefreshToken(tx, {
-      userId: user.id,
-      tokenHash,
-      familyId,
-      expiresAt: this.tokens.refreshExpiry(),
-      ip: ctx.ip,
-      userAgent: ctx.userAgent,
-    });
-
     return {
-      accessToken,
-      refreshToken: token,
-      expiresIn: 900,
-      mustReset: user.mustReset,
+      pair: { accessToken, refreshToken: token, expiresIn: 900, mustReset: user.mustReset },
+      tokenHash,
+      expiresAt: this.tokens.refreshExpiry(),
     };
   }
 

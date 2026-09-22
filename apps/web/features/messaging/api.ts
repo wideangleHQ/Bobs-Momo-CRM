@@ -108,4 +108,4 @@ export const pinMessage = (id: string, pinned: boolean) =>
 export const fetchUnreadCount = () => apiGet<{ count: number }>('/messages/unread-count');
 
 export const listMessagingDepartments = () =>
-  apiGet<{ data: DepartmentOption[] }>('/departments');
+  apiGet<{ data: DepartmentOption[] }>('/admin/departments');

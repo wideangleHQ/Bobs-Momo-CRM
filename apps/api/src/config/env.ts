@@ -21,6 +21,8 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  SLOW_REQUEST_MS: z.coerce.number().int().positive().default(1000),
+  SLOW_QUERY_MS: z.coerce.number().int().positive().default(300),
 });
 
 export type Env = z.infer<typeof envSchema>;

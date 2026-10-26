@@ -5,6 +5,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+const loadedFromEnv = { skip: Boolean(process.env['DATABASE_URL']) };
 if (!process.env['DATABASE_URL']) {
   const envPath = join(import.meta.dir, '..', 'apps', 'api', '.env');
   if (existsSync(envPath)) {
@@ -15,6 +16,31 @@ if (!process.env['DATABASE_URL']) {
       if (!key || process.env[key] !== undefined) continue;
       process.env[key] = (raw ?? '').trim().replace(/^["']|["']$/g, '');
     }
+  }
+}
+
+// The fallback above is a convenience for a local database. apps/api/.env can
+// just as easily point at the shared Supabase project, and the e2e suites create,
+// mutate and delete rows. If the fallback produced a non-local database, drop it
+// so the suite fails loudly instead of writing to shared data. Exporting
+// DATABASE_URL yourself, or ALLOW_REMOTE_TEST_DB=1, remains an explicit choice.
+if (!loadedFromEnv.skip && process.env['ALLOW_REMOTE_TEST_DB'] !== '1') {
+  const url = process.env['DATABASE_URL'];
+  let host = '';
+  try {
+    host = url ? new URL(url).hostname : '';
+  } catch {
+    host = '';
+  }
+  const local = ['localhost', '127.0.0.1', '[::1]', '::1', 'host.docker.internal'];
+  if (url && !local.includes(host)) {
+    delete process.env['DATABASE_URL'];
+    delete process.env['DIRECT_URL'];
+    console.error(
+      `[test-env] apps/api/.env points at a non-local database (host: ${host}). ` +
+        'It was NOT used. Export a local DATABASE_URL/DIRECT_URL/REDIS_URL, or set ' +
+        'ALLOW_REMOTE_TEST_DB=1 if you really mean it. DB-backed suites will fail.',
+    );
   }
 }
 

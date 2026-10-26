@@ -13,6 +13,7 @@ import { useCan, useSession } from '@/lib/auth';
 import { longDate, time } from '@/lib/format';
 import {
   endBreak,
+  getAttendanceSummary,
   getBoard,
   hm,
   listShifts,
@@ -20,13 +21,43 @@ import {
   punch,
   startBreak,
   stateLabel,
+  type AttendanceBoard,
   type AttendanceDayFull,
   type PunchState,
+  type SelfPunchBody,
 } from '@/features/workforce/api';
 import { workforceKeys } from '@/features/workforce/keys';
+import { VerificationBadge } from '@/features/workforce/verification-badge';
+import { ApiError } from '@/lib/api';
 import { toBusinessDate } from '@bobs-momo/shared';
 
 type Attempt = 'IN' | 'OUT';
+
+const LOCATION_MESSAGES: Record<number, string> = {
+  1: 'Location access is blocked. Allow location for this site in your browser settings, then tap again.',
+  2: 'Your device could not work out where you are. Turn on location services, then tap again.',
+  3: 'Finding your location took too long. Move somewhere with a clearer sky, then tap again.',
+};
+
+// The coordinates are sent for the server to measure. Nothing is decided here.
+function readLocation(): Promise<SelfPunchBody['location']> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+      reject(new Error('This browser cannot share your location, so it cannot be used to punch.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (p) =>
+        resolve({
+          latitude: p.coords.latitude,
+          longitude: p.coords.longitude,
+          accuracyM: p.coords.accuracy,
+        }),
+      (e) => reject(new Error(LOCATION_MESSAGES[e.code] ?? 'Could not read your location.')),
+      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 0 },
+    );
+  });
+}
 
 export default function AttendancePunchPage() {
   const { user, loading } = useSession();
@@ -42,19 +73,16 @@ export default function AttendancePunchPage() {
     return () => clearInterval(t);
   }, []);
 
-  // A key per attempt, held until that attempt succeeds. Tapping again after a
-  // lost response replays the original punch instead of creating a second one.
-  const keys = useRef<Partial<Record<Attempt, string>>>({});
-  const keyFor = (direction: Attempt): string => {
-    const held = keys.current[direction];
-    if (held) return held;
-    const fresh = crypto.randomUUID();
-    keys.current[direction] = fresh;
-    return fresh;
-  };
+  // The key and the exact body are held together until the attempt is settled.
+  // Tapping again after a lost response replays the same request (same key,
+  // same coordinates) instead of creating a second punch.
+  const attempts = useRef<Partial<Record<Attempt, { key: string; body: SelfPunchBody }>>>({});
 
   const [day, setDay] = useState<AttendanceDayFull | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [recovered, setRecovered] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ distanceM: number; radiusM: number } | null>(null);
 
   const board = useQuery({
     queryKey: workforceKeys.board(),
@@ -74,6 +102,14 @@ export default function AttendancePunchPage() {
   });
 
   const row = board.data?.employees.find((e) => e.employeeId === employeeId) ?? null;
+  const verification = row?.verificationStatus ?? null;
+  const rejected = verification === 'REJECTED';
+
+  const summary = useQuery({
+    queryKey: workforceKeys.summary({ self: true }),
+    queryFn: () => getAttendanceSummary({}),
+    enabled: Boolean(employeeId),
+  });
 
   const state: PunchState = day
     ? day.openBreak
@@ -94,23 +130,83 @@ export default function AttendancePunchPage() {
       ? [{ id: 'first', direction: 'IN' as const, punchedAt: row.firstInAt, source: 'WEB' }]
       : [];
 
-  const settle = (next: AttendanceDayFull, clear?: Attempt) => {
-    if (clear) delete keys.current[clear];
+  const refreshBoard = () => queryClient.invalidateQueries({ queryKey: workforceKeys.board() });
+
+  const settle = (next: AttendanceDayFull) => {
     setDay(next);
     setFailure(null);
-    void queryClient.invalidateQueries({ queryKey: workforceKeys.board() });
+    void refreshBoard();
   };
 
   const punchMutation = useMutation({
-    mutationFn: (direction: Attempt) => punch({ direction }, keyFor(direction)),
-    onSuccess: (res, direction) => settle(res.attendanceDay, direction),
-    onError: (err: Error) => setFailure(err.message),
+    mutationFn: async (direction: Attempt) => {
+      let held = attempts.current[direction];
+      if (!held) {
+        setLocating(true);
+        try {
+          const location = await readLocation();
+          held = { key: crypto.randomUUID(), body: { direction, location } };
+          attempts.current[direction] = held;
+        } finally {
+          setLocating(false);
+        }
+      }
+      return punch(held.body, held.key);
+    },
+    onSuccess: (res, direction) => {
+      delete attempts.current[direction];
+      setConfirmed(res.location);
+      setRecovered(null);
+      settle(res.attendanceDay);
+    },
+    onError: async (err: Error, direction) => {
+      setRecovered(null);
+      // A 4xx means the server refused and wrote nothing, so the next tap
+      // measures afresh. Anything else may have been written: keep the same key
+      // so a retry replays rather than duplicates.
+      if (err instanceof ApiError && err.status < 500) delete attempts.current[direction];
+      // Drop the local copy and re-read, so the screen shows what the server
+      // holds rather than what this tab last saw.
+      setDay(null);
+      setConfirmed(null);
+      setFailure(
+        attempts.current[direction]
+          ? `${err.message} Tap again to retry, it will not punch you twice.`
+          : err.message,
+      );
+      await refreshBoard();
+
+      // A lost response looks like a failure but the punch may have landed. Say
+      // so, and stop offering a retry that the board no longer needs.
+      const fresh = queryClient.getQueryData<AttendanceBoard>(workforceKeys.board());
+      const mine = fresh?.employees.find((e) => e.employeeId === employeeId);
+      const landed =
+        direction === 'IN'
+          ? mine?.state === 'IN' || mine?.state === 'ON_BREAK'
+          : mine?.state === 'OUT';
+      const transport = !(err instanceof ApiError) || err.status >= 500;
+      if (landed && transport) {
+        delete attempts.current[direction];
+        setFailure(null);
+        setRecovered(
+          direction === 'IN'
+            ? 'Your punch in did go through. You are punched in.'
+            : 'Your punch out did go through. You are punched out.',
+        );
+      }
+    },
   });
 
   const breakMutation = useMutation({
     mutationFn: (action: 'start' | 'end') => (action === 'start' ? startBreak({}) : endBreak()),
     onSuccess: (res) => settle(res),
-    onError: (err: Error) => setFailure(err.message),
+    onError: (err: Error) => {
+      // A break request that fails may still have landed (a lost response) or
+      // be stale (a second tab). Show what the server holds, not what we guessed.
+      setDay(null);
+      setFailure(err.message);
+      void refreshBoard();
+    },
   });
 
   if (loading) {
@@ -168,27 +264,50 @@ export default function AttendancePunchPage() {
             {lateMins > 0 ? (
               <p className="text-sm text-amber-700">Late by {lateMins} min</p>
             ) : null}
+            {verification ? (
+              <div className="flex justify-center pt-1">
+                <VerificationBadge status={verification} />
+              </div>
+            ) : null}
+            {rejected ? (
+              <p role="status" className="text-sm text-danger">
+                Your manager rejected today&apos;s attendance
+                {row?.verificationNote ? `: ${row.verificationNote}` : '.'}
+                <span className="mt-1 block">
+                  Ask your manager to review it. You cannot punch again on this day.
+                </span>
+              </p>
+            ) : null}
           </div>
         )}
 
         <Button
           type="button"
           className="min-h-[64px] w-full text-lg"
-          disabled={busy || board.isLoading}
+          disabled={busy || board.isLoading || rejected}
           onClick={() => punchMutation.mutate(nextDirection)}
         >
-          {punchMutation.isPending
-            ? 'Sending...'
-            : nextDirection === 'IN'
-              ? 'Punch in'
-              : 'Punch out'}
+          {locating
+            ? 'Finding your location...'
+            : punchMutation.isPending
+              ? 'Sending...'
+              : nextDirection === 'IN'
+                ? 'Punch in'
+                : 'Punch out'}
         </Button>
+
+        <p className="text-xs text-text-muted">
+          {row ? `${row.outletCode}: ` : ''}your location is checked when you punch.
+          {confirmed
+            ? ` Last punch was ${confirmed.distanceM} m from the outlet (limit ${confirmed.radiusM} m).`
+            : ''}
+        </p>
 
         <Button
           type="button"
           variant="secondary"
           className="min-h-[52px] w-full"
-          disabled={busy || board.isLoading || state === 'NOT_IN' || state === 'OUT'}
+          disabled={busy || board.isLoading || rejected || state === 'NOT_IN' || state === 'OUT'}
           onClick={() => breakMutation.mutate(state === 'ON_BREAK' ? 'end' : 'start')}
         >
           {breakMutation.isPending
@@ -198,9 +317,15 @@ export default function AttendancePunchPage() {
               : 'Start break'}
         </Button>
 
+        {recovered ? (
+          <p role="status" className="text-sm text-text-muted">
+            {recovered}
+          </p>
+        ) : null}
+
         {failure ? (
           <p role="alert" className="text-sm text-danger">
-            {failure} Tap again to retry, it will not punch you twice.
+            {failure}
           </p>
         ) : null}
       </Card>
@@ -229,14 +354,56 @@ export default function AttendancePunchPage() {
         ) : null}
       </Card>
 
+      <Card className="space-y-1 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-text-muted">
+          Attendance, last 365 days
+        </h2>
+        {summary.isLoading ? (
+          <Skeleton className="h-10 w-40" />
+        ) : summary.isError ? (
+          <p role="alert" className="text-sm text-danger">
+            {(summary.error as Error).message}
+          </p>
+        ) : summary.data ? (
+          <>
+            <p className="text-3xl font-semibold tabular-nums">
+              {summary.data.attendancePercent === null
+                ? 'N/A'
+                : `${summary.data.attendancePercent}%`}
+            </p>
+            <p className="text-sm text-text-muted">
+              {summary.data.verifiedPresentDays} verified present of {summary.data.eligibleDays}{' '}
+              eligible days
+              {summary.data.approvedLeaveDays > 0
+                ? `, ${summary.data.approvedLeaveDays} on approved leave`
+                : ''}
+              {summary.data.pendingDays > 0
+                ? `. ${summary.data.pendingDays} awaiting verification`
+                : ''}
+              {summary.data.rejectedDays > 0 ? `. ${summary.data.rejectedDays} rejected` : ''}.
+            </p>
+            {summary.data.attendancePercent === null ? (
+              <p className="text-sm text-text-muted">
+                No rostered working days yet, so there is nothing to measure.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </Card>
+
       {can('workforce.attendance.read') ? (
         <div className="flex flex-wrap gap-3">
-          <Link className="text-sm underline" href="/attendance/board">
+          <Link className="inline-flex min-h-[44px] items-center text-sm underline" href="/attendance/board">
             Attendance board
           </Link>
-          <Link className="text-sm underline" href="/attendance/history">
+          <Link className="inline-flex min-h-[44px] items-center text-sm underline" href="/attendance/history">
             Attendance history
           </Link>
+          {can('workforce.attendance.verify') ? (
+            <Link className="inline-flex min-h-[44px] items-center text-sm underline" href="/attendance/verify">
+              Verify attendance
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </div>

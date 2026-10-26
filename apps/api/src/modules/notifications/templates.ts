@@ -165,6 +165,25 @@ export const templates: Record<EventKey, Template> = {
     };
   },
 
+  ATTENDANCE_SUBMITTED: (p) => ({
+    title: 'Attendance to verify',
+    body:
+      `${text(p, 'employeeName', 'An employee')} submitted attendance for ` +
+      `${fmtDate(p['businessDate'])}.`,
+    deepLink: link('/attendance/verify'),
+  }),
+
+  ATTENDANCE_DECIDED: (p) => {
+    const verified = text(p, 'status') === 'VERIFIED';
+    return {
+      title: `Attendance ${verified ? 'verified' : 'rejected'}`,
+      body:
+        `Your attendance for ${fmtDate(p['businessDate'])} was ${verified ? 'verified' : 'rejected'}.` +
+        (str(p, 'note') ? ` Reason: ${text(p, 'note')}` : ''),
+      deepLink: link('/attendance'),
+    };
+  },
+
   PURCHASE_REQUESTED: (p) => ({
     title: `Purchase request ${text(p, 'requestNo', 'raised')}`,
     body:

@@ -6,10 +6,10 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
 type Size = 'sm' | 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800 focus-visible:ring-2 focus-visible:ring-red-600',
-  secondary: 'bg-white text-zinc-900 border border-zinc-300 hover:border-red-600 hover:text-red-600 hover:bg-red-50/40 active:bg-red-50',
-  ghost: 'bg-transparent text-zinc-900 hover:text-red-600 hover:bg-red-50/60 active:bg-red-100/60',
-  danger: 'bg-red-700 text-white hover:bg-red-800 active:bg-red-900 focus-visible:ring-2 focus-visible:ring-red-700',
+  primary: 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] hover:bg-[var(--color-primary-deep)] active:bg-[var(--color-primary-deep)] focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]',
+  secondary: 'bg-[var(--color-surface)] text-[var(--color-text)] border border-[var(--color-border-strong)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-bg)] active:bg-[var(--color-primary-bg)]',
+  ghost: 'bg-transparent text-[var(--color-text)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-bg)] active:bg-[var(--color-primary-bg)]',
+  danger: 'bg-[var(--color-danger)] text-[var(--color-primary-fg)] hover:bg-[var(--color-primary-deep)] active:bg-[var(--color-primary-deep)] focus-visible:ring-2 focus-visible:ring-[var(--color-danger)]',
 };
 
 // 44px is the floor everywhere. lg is for a screen's one primary action.
@@ -43,7 +43,7 @@ export function Button({
       disabled={disabled === true || pending}
       aria-busy={pending || undefined}
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-lg font-semibold cursor-pointer',
+        'inline-flex items-center justify-center gap-2 rounded-lg font-semibold cursor-pointer whitespace-nowrap',
         'transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-40 select-none',
         VARIANTS[variant],
         SIZES[size],
@@ -52,8 +52,10 @@ export function Button({
       )}
       {...rest}
     >
-      {pending ? <Spinner className="h-5 w-5" /> : null}
-      <span>{children}</span>
+      {pending ? <Spinner className="h-5 w-5 shrink-0" /> : null}
+      <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
+        {children}
+      </span>
     </button>
   );
 }

@@ -41,6 +41,16 @@
 - [Leave and salary](19-leave-and-salary.md)
 - [Tasks, checklists and audits](20-tasks-checklists-audits.md)
 
+# Part VI-A: Attendance deep-dive (Phase 2 reference)
+
+- [Attendance system overview](../docs/attendance/attendance-system-overview.md)
+- [Attendance workflows](../docs/attendance/attendance-workflows.md)
+- [Attendance state transitions](../docs/attendance/attendance-state-transitions.md)
+- [Attendance edge cases](../docs/attendance/attendance-edge-cases.md)
+- [Attendance acceptance tests](../docs/attendance/attendance-acceptance-tests.md)
+- [Attendance implementation audit](../docs/attendance/attendance-implementation-audit.md)
+- [Attendance open decisions](../docs/attendance/attendance-open-decisions.md)
+
 # Part VII: Automation and communication
 
 - [Notification engine](21-notification-engine.md)

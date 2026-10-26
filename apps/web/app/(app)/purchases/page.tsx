@@ -62,7 +62,7 @@ function PurchaseActionCard({
   return (
     <Link
       href={href}
-      className={`group relative flex flex-col justify-between rounded-2xl border p-5 sm:p-6 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 hover:-translate-y-0.5 hover:shadow-md ${
+      className={`group relative flex flex-col justify-between rounded-xl border p-5 sm:p-6 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 hover:-translate-y-0.5 hover:shadow-md ${
         primary
           ? 'border-red-200 bg-gradient-to-br from-red-50/70 via-white to-white hover:border-red-300 shadow-sm'
           : `border-zinc-200/80 bg-white ${scheme.border} shadow-sm`

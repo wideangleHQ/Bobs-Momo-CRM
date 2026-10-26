@@ -1,44 +1,57 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg:            #F8F8F7; /* Warm off-white */
+  /* ── Canvas ─────────────────────────────────────────── */
+  --color-bg:            #FAF9F7;
   --color-surface:       #FFFFFF;
-  --color-surface-muted: #FAFAF9;
-  --color-text:          #111827;
-  --color-text-muted:    #6B7280;
-  --color-border:        #F1F0EF;
-  --color-border-strong: #E4E3E1;
+  --color-surface-muted: #F5F4F2;
+  --color-text:          #171717;
+  --color-text-muted:    #77716D;
+  --color-border:        #E9E6E3;
+  --color-border-strong: #D4CFC9;
 
-  --color-primary:       #E63946; /* Bob's Momo Red */
+  /* ── Brand Red ──────────────────────────────────────── */
+  --color-primary:       #D9362B;
+  --color-primary-deep:  #A8201A;
   --color-primary-fg:    #FFFFFF;
-  --color-primary-bg:    #FFF1F2;
+  --color-primary-bg:    #FFF0EE;
 
-  --color-accent:        #FFD166; /* Bob's Momo Yellow */
-  --color-accent-fg:     #111827;
-  --color-accent-bg:     #FEF9C3;
+  /* ── Brand Yellow ───────────────────────────────────── */
+  --color-accent:        #FFC928;
+  --color-accent-fg:     #171717;
+  --color-accent-bg:     #FFF6D6;
 
+  /* ── Dark surfaces (black card variant) ─────────────── */
+  --color-dark:          #171717;
+  --color-dark-soft:     #292929;
+  --color-dark-fg:       #FFFFFF;
+  --color-dark-muted:    rgba(255,255,255,0.55);
+
+  /* ── Semantic (accessible only — not decorative) ────── */
   --color-success:       #059669;
   --color-success-bg:    #ECFDF5;
-
   --color-warning:       #D97706;
   --color-warning-bg:    #FFFBEB;
+  --color-danger:        #D9362B;
+  --color-danger-bg:     #FFF0EE;
 
-  --color-danger:        #E63946;
-  --color-danger-bg:     #FFF1F2;
+  /* ── Shape (5-12px corner radius) ──────────────────── */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 12px;
+  --radius-3xl: 12px;
 
-  --color-info:          #3B82F6;
-  --color-info-bg:       #EFF6FF;
-
-  /* radius-sm/md/lg map to rounded-sm/md/lg in Tailwind v4 */
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-lg: 20px;
-
+  /* ── Elevation ──────────────────────────────────────── */
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
-  --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.04);
-  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.07), 0 4px 8px -4px rgb(0 0 0 / 0.03);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 16px 32px -4px rgb(0 0 0 / 0.09), 0 4px 8px -4px rgb(0 0 0 / 0.04);
 
-  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* ── Typography ─────────────────────────────────────── */
+  /* Set at runtime by next/font via --font-poppins variable on <html> */
+  --font-sans: var(--font-poppins, "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, sans-serif);
 }
 
 html {
@@ -59,6 +72,24 @@ body {
 
 * {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Icon micro-animation (CSS only, zero dependency) ─── */
+/* Usage: wrap an <Icon> in a container with .icon-hover  */
+.icon-hover {
+  transition: transform 200ms ease-out;
+}
+.icon-hover:hover {
+  transform: scale(1.12) rotate(-2deg);
+}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .icon-hover,
+  .icon-hover:hover {
+    transition: none;
+    transform: none;
+  }
 }
 
 @media print {

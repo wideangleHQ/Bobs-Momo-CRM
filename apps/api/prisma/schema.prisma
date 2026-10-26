@@ -1,31 +1,40 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // Loads include/select relations in one SQL statement instead of one round
+  // trip per relation. Against a remote database each trip is ~100 ms.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = "postgresql://postgres.dtrpmwudupitmcvjiidk:Bobsmomo%4002@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Outlet {
-  id           String             @id @default(uuid()) @db.Uuid
-  code         String             @unique
-  name         String
-  address      String?
-  timezone     String             @default("Asia/Kolkata")
-  isActive     Boolean            @default(true)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  salesEntries DailySalesEntry[]
-  departments  Department[]
-  employees    Employee[]
-  itemStocks   ItemStock[]
-  purchases    Purchase[]
-  purchaseReqs PurchaseRequest[]
-  shifts       Shift[]
-  stockTxns    StockTransaction[]
-  tasks        Task[]
-  userOutlets  UserOutlet[]
+  id              String             @id @default(uuid()) @db.Uuid
+  code            String             @unique
+  name            String
+  address         String?
+  timezone        String             @default("Asia/Kolkata")
+  isActive        Boolean            @default(true)
+  // Attendance geofence. All three null = not configured, and self punches are
+  // refused rather than allowed from anywhere.
+  latitude        Float?
+  longitude       Float?
+  geofenceRadiusM Int?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  salesEntries    DailySalesEntry[]
+  departments     Department[]
+  employees       Employee[]
+  itemStocks      ItemStock[]
+  purchases       Purchase[]
+  purchaseReqs    PurchaseRequest[]
+  shifts          Shift[]
+  stockTxns       StockTransaction[]
+  tasks           Task[]
+  userOutlets     UserOutlet[]
 }
 
 model Department {
@@ -320,6 +329,12 @@ model AttendanceDay {
   breakMins    Int               @default(0)
   lateMins     Int               @default(0)
   note         String?
+  // Null = not a submission (leave/rollup rows) or pre-dates verification.
+  // Day-level on purpose: SRS A5.10 counts verified attendance once per workday.
+  verificationStatus AttendanceVerification?
+  verifiedById       String?                 @db.Uuid
+  verifiedAt         DateTime?
+  verificationNote   String?
   updatedAt    DateTime          @updatedAt
   employee     Employee          @relation(fields: [employeeId], references: [id])
   punches      AttendancePunch[]
@@ -327,6 +342,7 @@ model AttendanceDay {
 
   @@unique([employeeId, businessDate])
   @@index([outletId, businessDate])
+  @@index([outletId, verificationStatus, businessDate])
 }
 
 model AttendancePunch {
@@ -337,6 +353,11 @@ model AttendancePunch {
   source          String        @default("WEB")
   editedById      String?       @db.Uuid
   editReason      String?
+  // Self punches only. Device-reported; distanceM is the server's own haversine.
+  latitude        Float?
+  longitude       Float?
+  accuracyM       Float?
+  distanceM       Float?
   createdAt       DateTime      @default(now())
   day             AttendanceDay @relation(fields: [attendanceDayId], references: [id], onDelete: Cascade)
 
@@ -705,6 +726,12 @@ model AuditLog {
   @@index([entityType, entityId, createdAt])
   @@index([outletId, createdAt])
   @@index([actorId, createdAt])
+}
+
+enum AttendanceVerification {
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 enum RoleKey {

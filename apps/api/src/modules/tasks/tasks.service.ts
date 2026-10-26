@@ -104,7 +104,7 @@ export class TasksService {
 
   async list(query: ListTasksQuery, scope: RequestScope) {
     const where = this.buildWhere(query, scope);
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         include: TASK_LIST_INCLUDE,

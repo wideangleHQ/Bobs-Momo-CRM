@@ -694,9 +694,10 @@ export class AnalyticsService {
     const lastMonth = previousMonthRange(businessDate);
     const seriesFrom = shiftDate(businessDate, -(DASHBOARD_SERIES_DAYS - 1));
 
-    const [today, mtd, lastMonthNet, series, missing, purchases, wastage, stock, tasks, approvals, game] =
+    const [today, lastWeekSameDay, mtd, lastMonthNet, series, missing, purchases, wastage, stock, tasks, approvals, game] =
       await Promise.all([
         this.salesTotals(businessDate, businessDate, scope.outletIds),
+        this.salesTotals(shiftDate(businessDate, -7), shiftDate(businessDate, -7), scope.outletIds),
         this.salesTotals(monthStart, businessDate, scope.outletIds),
         this.salesTotals(lastMonth.from, lastMonth.to, scope.outletIds),
         this.netSalesSeries(seriesFrom, businessDate, scope.outletIds),
@@ -718,11 +719,6 @@ export class AnalyticsService {
 
     const purchaseCost = purchases._sum.totalAmount ?? ZERO;
     const wastageValue = wastage.reduce((acc, g) => acc.plus(g.value), ZERO);
-    const lastWeekSameDay = await this.salesTotals(
-      shiftDate(businessDate, -7),
-      shiftDate(businessDate, -7),
-      scope.outletIds,
-    );
 
     return {
       variant: 'owner' as const,
@@ -1099,12 +1095,14 @@ export class AnalyticsService {
   }
 
   private async taskCounts(outletIds: string[]) {
-    const rows = await this.prisma.task.groupBy({
-      by: ['status', 'outletId'],
-      where: { outletId: { in: outletIds }, status: { in: ['OPEN', 'IN_PROGRESS', 'OVERDUE'] } },
-      _count: { _all: true },
-    });
-    const outlets = await this.outletCodes(outletIds);
+    const [rows, outlets] = await Promise.all([
+      this.prisma.task.groupBy({
+        by: ['status', 'outletId'],
+        where: { outletId: { in: outletIds }, status: { in: ['OPEN', 'IN_PROGRESS', 'OVERDUE'] } },
+        _count: { _all: true },
+      }),
+      this.outletCodes(outletIds),
+    ]);
     const total = (status: TaskStatus): number =>
       rows.filter((r) => r.status === status).reduce((acc, r) => acc + r._count._all, 0);
 

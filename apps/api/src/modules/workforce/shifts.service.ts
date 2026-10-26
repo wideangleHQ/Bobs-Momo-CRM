@@ -39,7 +39,7 @@ export class ShiftsService {
         : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.shift.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

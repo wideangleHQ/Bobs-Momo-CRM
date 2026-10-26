@@ -46,7 +46,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      <Card className="w-full border-none shadow-2xl rounded-[15px] overflow-hidden bg-white/95 backdrop-blur-sm">
+      <Card className="w-full border-none shadow-2xl rounded-xl overflow-hidden bg-white/95 backdrop-blur-sm">
         {/* Top Navigation */}
         <div className="px-6 py-4 border-b border-zinc-100 flex items-center">
           <Link href="/" className="text-xs font-semibold text-zinc-500 hover:text-black transition-colors flex items-center gap-2">

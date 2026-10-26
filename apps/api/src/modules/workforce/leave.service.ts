@@ -40,7 +40,7 @@ export class LeaveService {
       ...(query.to ? { fromDate: { lte: new Date(`${query.to}T00:00:00.000Z`) } } : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.leaveRequest.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

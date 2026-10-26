@@ -1,11 +1,12 @@
 import { apiGet, apiPatch, apiPost } from '@/lib/api';
-import type { Paginated } from '@bobs-momo/shared';
+import type { Paginated, PunchDto } from '@bobs-momo/shared';
 
 // ---- types, mirroring what the workforce services return ------------------
 
 export type EmploymentStatus = 'ACTIVE' | 'ON_NOTICE' | 'EXITED';
 export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'ON_LEAVE' | 'WEEKLY_OFF';
 export type PunchState = 'NOT_IN' | 'IN' | 'ON_BREAK' | 'OUT';
+export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 export type LeaveType = 'CASUAL' | 'SICK' | 'UNPAID' | 'COMP_OFF';
 export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 
@@ -38,6 +39,9 @@ export interface AttendanceDayRow {
   workedMins: number;
   breakMins: number;
   lateMins: number;
+  verificationStatus: VerificationStatus | null;
+  verifiedAt: string | null;
+  verificationNote: string | null;
 }
 
 export interface BoardRow {
@@ -52,6 +56,8 @@ export interface BoardRow {
   workedMins: number;
   breakMins: number;
   lateMins: number;
+  verificationStatus: VerificationStatus | null;
+  verificationNote: string | null;
 }
 
 export interface AttendanceBoard {
@@ -149,8 +155,19 @@ export const exitEmployee = (id: string, body: unknown) =>
  * is generated once per attempt and reused across retries of that attempt, so a
  * lost response replays the original punch instead of creating a second one.
  */
-export const punch = (body: unknown, idempotencyKey: string) =>
-  apiPost<{ attendanceDay: AttendanceDayFull; punch: AttendanceDayFull['punches'][number] }>(
+export interface SelfPunchBody {
+  direction: 'IN' | 'OUT';
+  location: { latitude: number; longitude: number; accuracyM: number };
+}
+export type ManagerPunchBody = PunchDto;
+export type PunchBody = SelfPunchBody | ManagerPunchBody;
+
+export const punch = (body: PunchBody, idempotencyKey: string) =>
+  apiPost<{
+    attendanceDay: AttendanceDayFull;
+    punch: AttendanceDayFull['punches'][number];
+    location: { distanceM: number; radiusM: number } | null;
+  }>(
     '/attendance/punch',
     body,
     { headers: { 'Idempotency-Key': idempotencyKey } },
@@ -162,6 +179,62 @@ export const startBreak = (body: unknown) =>
 export const endBreak = () => apiPost<AttendanceDayFull>('/attendance/break/end', {});
 
 export const getBoard = () => apiGet<AttendanceBoard>('/attendance/today');
+
+export interface VerificationQueueRow {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  employeeCode: string;
+  outletCode: string | null;
+  businessDate: string;
+  firstInAt: string | null;
+  lastOutAt: string | null;
+  workedMins: number;
+  breakMins: number;
+  lateMins: number;
+  punches: { id: string; direction: 'IN' | 'OUT'; punchedAt: string; source: string }[];
+  location: { distanceM: number; accuracyM: number | null; radiusM: number | null } | null;
+}
+
+export const getVerificationQueue = (params: Record<string, string | number | undefined>) =>
+  apiGet<Paginated<VerificationQueueRow>>(`/attendance/verification-queue${qs(params)}`);
+
+export const verifyDay = (id: string, body: { note?: string } = {}) =>
+  apiPost<{ id: string; verificationStatus: VerificationStatus }>(
+    `/attendance/days/${id}/verify`,
+    body,
+  );
+
+export const rejectDay = (id: string, body: { reason: string }) =>
+  apiPost<{ id: string; verificationStatus: VerificationStatus }>(
+    `/attendance/days/${id}/reject`,
+    body,
+  );
+
+export interface SummaryCounts {
+  scheduledWorkingDays: number;
+  approvedLeaveDays: number;
+  eligibleDays: number;
+  verifiedPresentDays: number;
+  /** null means there are no eligible days: show N/A, never 0%. */
+  attendancePercent: number | null;
+  halfDayLeaveDays: number;
+  inProgressDays: number;
+  pendingDays: number;
+  rejectedDays: number;
+  unverifiedDays: number;
+  verifiedOnIneligibleDays: number;
+}
+
+export interface AttendanceSummary extends SummaryCounts {
+  employeeId: string;
+  from: string;
+  to: string;
+  months: (SummaryCounts & { month: string })[];
+}
+
+export const getAttendanceSummary = (params: Record<string, string | number | undefined>) =>
+  apiGet<AttendanceSummary>(`/attendance/summary${qs(params)}`);
 
 export const listAttendance = (params: Record<string, string | number | undefined>) =>
   apiGet<Paginated<AttendanceDayRow>>(`/attendance${qs(params)}`);

@@ -70,7 +70,7 @@ export class AdminUsersService {
         : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

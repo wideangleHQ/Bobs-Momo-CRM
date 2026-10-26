@@ -13,6 +13,10 @@ export const ATTENDANCE_STATUSES = [
   'ON_LEAVE',
   'WEEKLY_OFF',
 ] as const;
+export const VERIFICATION_STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'] as const;
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+/** SRS Amendment v1.1 A7: today plus the previous 364 business dates. */
+export const ATTENDANCE_WINDOW_DAYS = 365;
 export const LEAVE_TYPES = ['CASUAL', 'SICK', 'UNPAID', 'COMP_OFF'] as const;
 export const LEAVE_STATUSES = ['PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'] as const;
 
@@ -59,6 +63,16 @@ export const punchSchema = z
     employeeId: uuidSchema.optional(),
     at: z.string().datetime().optional(),
     reason: z.string().trim().min(3).max(280).optional(),
+    // Device-reported and untrusted: the server measures the distance itself.
+    // Required on a self punch, ignored on a manager entry.
+    location: z
+      .object({
+        latitude: z.number().min(-90).max(90),
+        longitude: z.number().min(-180).max(180),
+        accuracyM: z.number().nonnegative().max(1_000_000).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type PunchDto = z.infer<typeof punchSchema>;
@@ -80,10 +94,32 @@ export const listAttendanceQuery = pageQuerySchema.extend({
   outletId: uuidSchema.optional(),
   employeeId: uuidSchema.optional(),
   status: z.enum(ATTENDANCE_STATUSES).optional(),
+  verification: z.enum(VERIFICATION_STATUSES).optional(),
   from: businessDateSchema.optional(),
   to: businessDateSchema.optional(),
 });
 export type ListAttendanceQuery = z.infer<typeof listAttendanceQuery>;
+
+export const verifyAttendanceSchema = z
+  .object({ note: z.string().trim().max(280).optional() })
+  .strict();
+export type VerifyAttendanceDto = z.infer<typeof verifyAttendanceSchema>;
+
+// A rejection the employee cannot read is a rejection they will argue with.
+export const rejectAttendanceSchema = z
+  .object({ reason: z.string().trim().min(5, 'Give a reason of at least 5 characters').max(280) })
+  .strict();
+export type RejectAttendanceDto = z.infer<typeof rejectAttendanceSchema>;
+
+export const verificationQueueQuery = pageQuerySchema.extend({ outletId: uuidSchema.optional() });
+export type VerificationQueueQuery = z.infer<typeof verificationQueueQuery>;
+
+export const attendanceSummaryQuery = z.object({
+  employeeId: uuidSchema.optional(),
+  from: businessDateSchema.optional(),
+  to: businessDateSchema.optional(),
+});
+export type AttendanceSummaryQuery = z.infer<typeof attendanceSummaryQuery>;
 
 // ---- shifts --------------------------------------------------------------
 

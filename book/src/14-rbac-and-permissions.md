@@ -199,6 +199,7 @@ Columns are the nine roles, abbreviated to keep the table on screen.
 | `workforce.attendance.punch_self` | S | S | S | S | S | S | S | S | S |
 | `workforce.attendance.read` | A | A | O | O | S | S | A | S | S |
 | `workforce.attendance.edit` | A | A | O | | | | A | | |
+| `workforce.attendance.verify` | | | O | | | | | | |
 | `workforce.break.log_self` | S | S | S | S | S | S | S | S | S |
 | `workforce.shift.create` | A | A | O | O | | | | | |
 | `workforce.shift.read` | A | A | O | O | S | S | A | S | S |
@@ -271,7 +272,7 @@ Columns are the nine roles, abbreviated to keep the table on screen.
 | `crm.reward.redeem` | A | A | O | | | | | | O |
 | `crm.analytics.read` | A | A | O | | | | | | |
 
-That is 84 keys. The public game endpoints that a customer's browser hits carry
+That is 85 keys. The public game endpoints that a customer's browser hits carry
 no key at all: they are unauthenticated, rate limited, and covered in the CRM
 chapter.
 
@@ -279,7 +280,7 @@ chapter.
 
 ### Owner
 
-Bob holds all 84 keys at `ALL_OUTLETS`. Four of them are his alone:
+Bob holds 84 of the 85 keys at `ALL_OUTLETS`; the exception is `workforce.attendance.verify`, which is Store Manager only (SRS Amendment v1.1 A2/A3: owner oversight does not replace manager verification by default). Four of them are his alone:
 `admin.user.assign_role`, `admin.outlet.manage`, `sales.entry.unlock` and
 `analytics.pnl.read`. Everything a manager can do, he can do, at either outlet,
 without asking. He will most likely complain that the dashboard opens on today

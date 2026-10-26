@@ -30,6 +30,16 @@ export class AuthRepository {
     return this.prisma.refreshToken.findUnique({ where: { tokenHash } });
   }
 
+  /** The refresh path needs both, and every hard page load waits on it. */
+  findRefreshTokenWithUser(tokenHash: string) {
+    return this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: { include: { employee: { select: { id: true, fullName: true } }, outlets: true } },
+      },
+    });
+  }
+
   revokeToken(tx: Tx, id: string) {
     return tx.refreshToken.update({ where: { id }, data: { revokedAt: new Date() } });
   }

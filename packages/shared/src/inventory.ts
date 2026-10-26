@@ -11,7 +11,15 @@ export const signedQtySchema = z.coerce
   .refine((v) => v !== 0, 'An adjustment of zero changes nothing');
 
 /** "2026-08-26". Compared as a string, which sorts correctly for ISO dates. */
-export const businessDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD');
+// The regex alone accepts 2026-13-45, which becomes an Invalid Date and reaches
+// the database as a 500. Round-tripping proves the calendar date is real.
+export const businessDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+  .refine((d) => {
+    const at = new Date(`${d}T00:00:00.000Z`);
+    return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === d;
+  }, 'Not a real calendar date');
 
 export const MANUAL_TXN_TYPES = ['OPENING', 'RECEIVED', 'ISSUED', 'WASTAGE', 'ADJUSTMENT'] as const;
 export const ALL_TXN_TYPES = [

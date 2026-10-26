@@ -93,7 +93,7 @@ export default function ReportsIndexPage() {
               <Link
                 key={report.href}
                 href={report.href}
-                className={`group relative flex flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md ${scheme.border} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500`}
+                className={`group relative flex flex-col justify-between rounded-xl border border-zinc-200/80 bg-white p-5 sm:p-6 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md ${scheme.border} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500`}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-4">

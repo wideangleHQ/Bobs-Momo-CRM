@@ -1,18 +1,24 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  ATTENDANCE_WINDOW_DAYS,
   ERROR_CODES,
+  businessDateOffset,
   paginate,
   toBusinessDate,
+  type AttendanceSummaryQuery,
   type EditPunchDto,
   type ListAttendanceQuery,
   type PunchDto,
   type StartBreakDto,
+  type VerificationQueueQuery,
 } from '@bobs-momo/shared';
 import { DomainError } from '../../common/errors/domain.error';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { AuthedUser, RequestScope } from '../../common/types/request';
 import { narrowOutlets as narrow } from '../../common/types/request';
+import { summariseAttendance } from './attendance-summary';
+import { haversineMetres, withinGeofence } from './geofence';
 
 // Lateness is only meaningful against a commitment, and ten minutes of it is
 // forgiven because a bus is a bus.
@@ -31,10 +37,19 @@ export class AttendanceService {
   constructor(private readonly prisma: PrismaService) {}
 
   async punch(dto: PunchDto, user: AuthedUser, scope: RequestScope) {
+    // A self-scoped grant can never backdate. Before this, `at` alone flipped the
+    // punch to a MANAGER_EDIT entry, so any employee could file their own time.
+    if (scope.selfEmployeeId && dto.at) {
+      throw DomainError.forbidden('Only a manager can set the punch time');
+    }
     const employee = await this.resolveEmployee(dto.employeeId, user, scope);
-    const isManagerEntry = Boolean(dto.employeeId ?? dto.at);
-    const at = dto.at ? new Date(dto.at) : new Date();
+    const isManagerEntry =
+      !scope.selfEmployeeId &&
+      Boolean(dto.at || (dto.employeeId && dto.employeeId !== user.employeeId));
+    const at = isManagerEntry && dto.at ? new Date(dto.at) : new Date();
+    assertNotFuture(at);
     const businessDate = toBusinessDate(at);
+    const evidence = isManagerEntry ? null : await this.checkGeofence(employee, dto.location);
 
     return this.prisma.$transaction(async (tx) => {
       const day = await tx.attendanceDay.upsert({
@@ -53,7 +68,21 @@ export class AttendanceService {
         update: {},
       });
 
-      // FOR UPDATE serialises two taps that arrive eighty milliseconds apart.
+      // Lock the day row, not just the punches: on a first punch there are no
+      // punch rows yet, so two simultaneous INs would both pass the check below.
+      await tx.$queryRaw`SELECT "id" FROM "AttendanceDay" WHERE "id" = ${day.id}::uuid FOR UPDATE`;
+      const { verificationStatus } = await tx.attendanceDay.findUniqueOrThrow({
+        where: { id: day.id },
+        select: { verificationStatus: true },
+      });
+      // A rejected day is closed to the employee. Reinstating it is a manager's
+      // decision (SRS A2), so a self punch cannot quietly reopen it.
+      if (!isManagerEntry && verificationStatus === 'REJECTED') {
+        throw DomainError.conflict(
+          ERROR_CODES.ATTENDANCE_DAY_REJECTED,
+          'This day was rejected. Ask your manager to review it.',
+        );
+      }
       const punches = await tx.$queryRaw<PunchRow[]>`
         SELECT "id", "direction", "punchedAt"
         FROM "AttendancePunch"
@@ -62,6 +91,20 @@ export class AttendanceService {
         FOR UPDATE`;
 
       const last = punches.at(-1);
+      // Checking out mid-break would leave a break with no end. Never invent
+      // one: make the employee end it.
+      if (!isManagerEntry && dto.direction === 'OUT') {
+        const openBreak = await tx.breakLog.findFirst({
+          where: { attendanceDayId: day.id, endedAt: null },
+          select: { id: true },
+        });
+        if (openBreak) {
+          throw DomainError.conflict(
+            ERROR_CODES.ATTENDANCE_BREAK_STILL_OPEN,
+            'End your break before punching out',
+          );
+        }
+      }
       if (dto.direction === 'IN' && last?.direction === 'IN') {
         throw DomainError.conflict(
           ERROR_CODES.ATTENDANCE_ALREADY_PUNCHED_IN,
@@ -83,12 +126,124 @@ export class AttendanceService {
           source: isManagerEntry ? 'MANAGER_EDIT' : 'WEB',
           editedById: isManagerEntry ? user.sub : null,
           editReason: dto.reason ?? null,
+          ...(evidence
+            ? {
+                latitude: evidence.latitude,
+                longitude: evidence.longitude,
+                accuracyM: evidence.accuracyM,
+                distanceM: evidence.distanceM,
+              }
+            : {}),
         },
       });
 
+      // The first punch of a day becomes a submission awaiting a manager. The
+      // outbox row commits or rolls back with it, so a manager is never told
+      // about a punch that does not exist.
+      if (verificationStatus === null) {
+        await tx.attendanceDay.update({
+          where: { id: day.id },
+          data: { verificationStatus: 'PENDING' },
+        });
+        if (!isManagerEntry) {
+          await tx.outboxEvent.create({
+            data: {
+              eventKey: 'ATTENDANCE_SUBMITTED',
+              aggregateType: 'AttendanceDay',
+              aggregateId: day.id,
+              payload: {
+                employeeId: employee.id,
+                employeeName: employee.fullName,
+                outletId: employee.outletId,
+                businessDate,
+              },
+            },
+          });
+        }
+      }
+      if (isManagerEntry) {
+        await tx.auditLog.create({
+          data: {
+            actorId: user.sub,
+            actorLabel: user.sub,
+            action: 'workforce.attendance.manual_punch',
+            entityType: 'AttendanceDay',
+            entityId: day.id,
+            outletId: employee.outletId,
+            after: {
+              direction: dto.direction,
+              punchedAt: at.toISOString(),
+              reason: dto.reason ?? null,
+            } as Prisma.InputJsonValue,
+          },
+        });
+      }
+
       const updated = await this.recompute(tx, day.id, employee.id, businessDate);
-      return { attendanceDay: updated, punch: { id: punch.id, direction: punch.direction, punchedAt: punch.punchedAt.toISOString() } };
+      return {
+        attendanceDay: updated,
+        punch: {
+          id: punch.id,
+          direction: punch.direction,
+          punchedAt: punch.punchedAt.toISOString(),
+          source: punch.source,
+        },
+        location: evidence
+          ? { distanceM: Math.round(evidence.distanceM), radiusM: evidence.radiusM }
+          : null,
+      };
     });
+  }
+
+  /**
+   * Authoritative location check for a self punch. The device coordinates are
+   * input, never proof: the outlet comes from the employee row, not the request.
+   */
+  private async checkGeofence(
+    employee: { outletId: string },
+    location: PunchDto['location'],
+  ) {
+    const outlet = await this.prisma.outlet.findUniqueOrThrow({
+      where: { id: employee.outletId },
+      select: { isActive: true, latitude: true, longitude: true, geofenceRadiusM: true, name: true },
+    });
+    if (!outlet.isActive) {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_OUTLET_INACTIVE,
+        `${outlet.name} is not active, so attendance cannot be recorded there`,
+      );
+    }
+    if (outlet.latitude === null || outlet.longitude === null || outlet.geofenceRadiusM === null) {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_OUTLET_NOT_CONFIGURED,
+        `${outlet.name} has no attendance location set. Ask an administrator.`,
+      );
+    }
+    if (!location) {
+      throw DomainError.badRequest(
+        ERROR_CODES.ATTENDANCE_LOCATION_REQUIRED,
+        'Your location is required to punch. Allow location access and try again.',
+      );
+    }
+
+    const distanceM = haversineMetres(location, {
+      latitude: outlet.latitude,
+      longitude: outlet.longitude,
+    });
+    if (!withinGeofence(distanceM, outlet.geofenceRadiusM)) {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_OUTSIDE_GEOFENCE,
+        `You are ${Math.round(distanceM)} m from ${outlet.name}. Punching is allowed within ${outlet.geofenceRadiusM} m.`,
+        { distanceM: Math.round(distanceM), radiusM: outlet.geofenceRadiusM },
+      );
+    }
+    return {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracyM: location.accuracyM ?? null,
+      distanceM,
+      radiusM: outlet.geofenceRadiusM,
+    };
   }
 
   async startBreak(dto: StartBreakDto, user: AuthedUser, scope: RequestScope) {
@@ -96,6 +251,7 @@ export class AttendanceService {
     const businessDate = toBusinessDate();
 
     return this.prisma.$transaction(async (tx) => {
+      await this.lockDay(tx, employee.id, businessDate);
       const day = await tx.attendanceDay.findUnique({
         where: {
           employeeId_businessDate: {
@@ -105,6 +261,7 @@ export class AttendanceService {
         },
         include: { punches: { orderBy: { punchedAt: 'asc' } }, breaks: true },
       });
+      this.assertNotRejected(day?.verificationStatus);
       if (!day || day.punches.at(-1)?.direction !== 'IN') {
         throw DomainError.conflict(
           ERROR_CODES.ATTENDANCE_NOT_PUNCHED_IN,
@@ -130,6 +287,7 @@ export class AttendanceService {
     const businessDate = toBusinessDate();
 
     return this.prisma.$transaction(async (tx) => {
+      await this.lockDay(tx, employee.id, businessDate);
       const day = await tx.attendanceDay.findUnique({
         where: {
           employeeId_businessDate: {
@@ -139,6 +297,7 @@ export class AttendanceService {
         },
         include: { breaks: true },
       });
+      this.assertNotRejected(day?.verificationStatus);
       const open = day?.breaks.find((b) => b.endedAt === null);
       if (!day || !open) {
         throw DomainError.conflict(ERROR_CODES.ATTENDANCE_BREAK_NOT_OPEN, 'No break is running');
@@ -176,6 +335,7 @@ export class AttendanceService {
     return this.prisma.$transaction(async (tx) => {
       const before = { punchedAt: punch.punchedAt.toISOString(), source: punch.source };
       const punchedAt = new Date(dto.punchedAt);
+      assertNotFuture(punchedAt);
       await tx.attendancePunch.update({
         where: { id },
         data: {
@@ -207,6 +367,13 @@ export class AttendanceService {
   }
 
   async list(query: ListAttendanceQuery, scope: RequestScope) {
+    const windowStart = rollingWindowStart();
+    if (query.from && query.from < windowStart) {
+      throw DomainError.badRequest(
+        ERROR_CODES.ATTENDANCE_WINDOW_EXCEEDED,
+        `Attendance history covers the last ${ATTENDANCE_WINDOW_DAYS} days, from ${windowStart}`,
+      );
+    }
     const where: Prisma.AttendanceDayWhereInput = {
       outletId: { in: narrow(query.outletId, scope) },
       ...(scope.selfEmployeeId
@@ -215,17 +382,14 @@ export class AttendanceService {
           ? { employeeId: query.employeeId }
           : {}),
       ...(query.status ? { status: query.status } : {}),
-      ...(query.from || query.to
-        ? {
-            businessDate: {
-              ...(query.from ? { gte: new Date(`${query.from}T00:00:00.000Z`) } : {}),
-              ...(query.to ? { lte: new Date(`${query.to}T00:00:00.000Z`) } : {}),
-            },
-          }
-        : {}),
+      ...(query.verification ? { verificationStatus: query.verification } : {}),
+      businessDate: {
+        gte: new Date(`${query.from ?? windowStart}T00:00:00.000Z`),
+        ...(query.to ? { lte: new Date(`${query.to}T00:00:00.000Z`) } : {}),
+      },
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.attendanceDay.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,
@@ -250,6 +414,9 @@ export class AttendanceService {
         workedMins: d.workedMins,
         breakMins: d.breakMins,
         lateMins: d.lateMins,
+        verificationStatus: d.verificationStatus,
+        verifiedAt: d.verifiedAt?.toISOString() ?? null,
+        verificationNote: d.verificationNote,
       })),
       total,
       query,
@@ -299,9 +466,281 @@ export class AttendanceService {
           workedMins: day?.workedMins ?? 0,
           breakMins: day?.breakMins ?? 0,
           lateMins: day?.lateMins ?? 0,
+          verificationStatus: day?.verificationStatus ?? null,
+          verificationNote: day?.verificationNote ?? null,
         };
       }),
     };
+  }
+
+  /** Pending submissions in the caller's outlets, oldest first, never their own. */
+  async verificationQueue(query: VerificationQueueQuery, user: AuthedUser, scope: RequestScope) {
+    const where: Prisma.AttendanceDayWhereInput = {
+      outletId: { in: narrow(query.outletId, scope) },
+      verificationStatus: 'PENDING',
+      ...(user.employeeId ? { employeeId: { not: user.employeeId } } : {}),
+    };
+    const [rows, total, outlets] = await Promise.all([
+      this.prisma.attendanceDay.findMany({
+        where,
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        orderBy: [{ businessDate: 'asc' }, { firstInAt: 'asc' }],
+        include: {
+          employee: { select: { id: true, fullName: true, employeeCode: true } },
+          punches: {
+            orderBy: { punchedAt: 'asc' },
+            select: {
+              id: true,
+              direction: true,
+              punchedAt: true,
+              source: true,
+              distanceM: true,
+              accuracyM: true,
+            },
+          },
+        },
+      }),
+      this.prisma.attendanceDay.count({ where }),
+      this.prisma.outlet.findMany({
+        where: { id: { in: scope.outletIds } },
+        select: { id: true, code: true, geofenceRadiusM: true },
+      }),
+    ]);
+    const outletById = new Map(outlets.map((o) => [o.id, o]));
+
+    return paginate(
+      rows.map((d) => {
+        // Only the measured distance is shown, never the coordinates.
+        const located = d.punches.find((p) => p.distanceM !== null);
+        return {
+          id: d.id,
+          employeeId: d.employeeId,
+          employeeName: d.employee.fullName,
+          employeeCode: d.employee.employeeCode,
+          outletCode: outletById.get(d.outletId)?.code ?? null,
+          businessDate: d.businessDate.toISOString().slice(0, 10),
+          firstInAt: d.firstInAt?.toISOString() ?? null,
+          lastOutAt: d.lastOutAt?.toISOString() ?? null,
+          workedMins: d.workedMins,
+          breakMins: d.breakMins,
+          lateMins: d.lateMins,
+          punches: d.punches.map((p) => ({
+            id: p.id,
+            direction: p.direction,
+            punchedAt: p.punchedAt.toISOString(),
+            source: p.source,
+          })),
+          location: located
+            ? {
+                distanceM: Math.round(located.distanceM ?? 0),
+                accuracyM: located.accuracyM === null ? null : Math.round(located.accuracyM),
+                radiusM: outletById.get(d.outletId)?.geofenceRadiusM ?? null,
+              }
+            : null,
+        };
+      }),
+      total,
+      query,
+    );
+  }
+
+  /**
+   * One decision per submission. The conditional update is the lock: of two
+   * managers deciding at once exactly one matches PENDING and the other gets a
+   * 409. The audit row and the employee notification are written in the same
+   * transaction, so they exist if and only if the decision does.
+   */
+  async decide(
+    id: string,
+    to: 'VERIFIED' | 'REJECTED',
+    note: string | undefined,
+    user: AuthedUser,
+    scope: RequestScope,
+  ) {
+    const day = await this.prisma.attendanceDay.findUnique({
+      where: { id },
+      include: { employee: { select: { id: true, userId: true, fullName: true } } },
+    });
+    if (!day || !scope.outletIds.includes(day.outletId)) {
+      throw new DomainError(
+        HttpStatus.NOT_FOUND,
+        ERROR_CODES.ATTENDANCE_DAY_NOT_FOUND,
+        'That attendance record does not exist',
+      );
+    }
+    // Identity comes from the verified token, never the body.
+    if (day.employee.userId === user.sub || day.employeeId === user.employeeId) {
+      throw new DomainError(
+        HttpStatus.FORBIDDEN,
+        ERROR_CODES.ATTENDANCE_SELF_VERIFY,
+        'You cannot verify or reject your own attendance',
+      );
+    }
+    if (day.verificationStatus !== 'PENDING') {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_NOT_PENDING,
+        day.verificationStatus
+          ? `That record is already ${day.verificationStatus.toLowerCase()}`
+          : 'That record was not submitted for verification',
+      );
+    }
+
+    const businessDate = day.businessDate.toISOString().slice(0, 10);
+    return this.prisma.$transaction(async (tx) => {
+      const decidedAt = new Date();
+      const claimed = await tx.attendanceDay.updateMany({
+        where: { id, verificationStatus: 'PENDING' },
+        data: {
+          verificationStatus: to,
+          verifiedById: user.sub,
+          verifiedAt: decidedAt,
+          verificationNote: note ?? null,
+        },
+      });
+      if (claimed.count === 0) {
+        throw DomainError.conflict(
+          ERROR_CODES.ATTENDANCE_NOT_PENDING,
+          'That record has already been decided',
+        );
+      }
+      await tx.auditLog.create({
+        data: {
+          actorId: user.sub,
+          actorLabel: user.sub,
+          action: to === 'VERIFIED' ? 'workforce.attendance.verify' : 'workforce.attendance.reject',
+          entityType: 'AttendanceDay',
+          entityId: id,
+          outletId: day.outletId,
+          before: { verificationStatus: 'PENDING' } as Prisma.InputJsonValue,
+          after: {
+            verificationStatus: to,
+            employeeId: day.employeeId,
+            businessDate,
+            note: note ?? null,
+          } as Prisma.InputJsonValue,
+        },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          eventKey: 'ATTENDANCE_DECIDED',
+          aggregateType: 'AttendanceDay',
+          aggregateId: id,
+          payload: {
+            employeeId: day.employeeId,
+            outletId: day.outletId,
+            businessDate,
+            status: to,
+            note: note ?? null,
+          },
+        },
+      });
+      return {
+        id,
+        employeeId: day.employeeId,
+        businessDate,
+        verificationStatus: to,
+        verifiedAt: decidedAt.toISOString(),
+        verificationNote: note ?? null,
+      };
+    });
+  }
+
+  /** The only place the attendance percentage is computed; employee and manager views both read it. */
+  async summary(query: AttendanceSummaryQuery, scope: RequestScope) {
+    if (scope.selfEmployeeId && query.employeeId && query.employeeId !== scope.selfEmployeeId) {
+      throw DomainError.notFound();
+    }
+    const employeeId = scope.selfEmployeeId ?? query.employeeId;
+    if (!employeeId) {
+      throw DomainError.badRequest(ERROR_CODES.COMMON_VALIDATION_FAILED, 'Say which employee to summarise');
+    }
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      select: { id: true, outletId: true, joinedOn: true, exitedOn: true },
+    });
+    if (!employee || !scope.outletIds.includes(employee.outletId)) {
+      throw new DomainError(
+        HttpStatus.NOT_FOUND,
+        ERROR_CODES.EMPLOYEE_NOT_FOUND,
+        'That employee does not exist',
+      );
+    }
+
+    const today = toBusinessDate();
+    const windowStart = rollingWindowStart();
+    const from = query.from ?? windowStart;
+    const to = query.to ?? today;
+    if (from < windowStart) {
+      throw DomainError.badRequest(
+        ERROR_CODES.ATTENDANCE_WINDOW_EXCEEDED,
+        `Attendance history covers the last ${ATTENDANCE_WINDOW_DAYS} days, from ${windowStart}`,
+      );
+    }
+    if (from > to) {
+      throw DomainError.badRequest(ERROR_CODES.COMMON_VALIDATION_FAILED, 'From must not be after to');
+    }
+
+    const lo = new Date(`${from}T00:00:00.000Z`);
+    const hi = new Date(`${to}T00:00:00.000Z`);
+    const [days, shifts, leave] = await Promise.all([
+      this.prisma.attendanceDay.findMany({
+        where: { employeeId, businessDate: { gte: lo, lte: hi } },
+        select: { businessDate: true, status: true, verificationStatus: true },
+      }),
+      this.prisma.shift.findMany({
+        where: { employeeId, status: 'SCHEDULED', shiftDate: { gte: lo, lte: hi } },
+        select: { shiftDate: true },
+      }),
+      this.prisma.leaveRequest.findMany({
+        where: { employeeId, status: 'APPROVED', fromDate: { lte: hi }, toDate: { gte: lo } },
+        select: { fromDate: true, toDate: true, dayCount: true },
+      }),
+    ]);
+
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return {
+      employeeId,
+      ...summariseAttendance({
+        from,
+        to,
+        today,
+        joinedOn: iso(employee.joinedOn),
+        exitedOn: employee.exitedOn ? iso(employee.exitedOn) : null,
+        scheduledDates: shifts.map((x) => iso(x.shiftDate)),
+        days: days.map((d) => ({
+          businessDate: iso(d.businessDate),
+          status: d.status,
+          verificationStatus: d.verificationStatus,
+        })),
+        approvedLeave: leave.map((l) => ({
+          fromDate: iso(l.fromDate),
+          toDate: iso(l.toDate),
+          halfDay: l.dayCount.lt(1),
+        })),
+      }),
+    };
+  }
+
+  /** Serialises everything that touches one employee-day, including breaks. */
+  private async lockDay(
+    tx: Prisma.TransactionClient,
+    employeeId: string,
+    businessDate: string,
+  ): Promise<void> {
+    await tx.$queryRaw`
+      SELECT "id" FROM "AttendanceDay"
+      WHERE "employeeId" = ${employeeId}::uuid AND "businessDate" = ${businessDate}::date
+      FOR UPDATE`;
+  }
+
+  private assertNotRejected(status: string | null | undefined): void {
+    if (status === 'REJECTED') {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_DAY_REJECTED,
+        'This day was rejected. Ask your manager to review it.',
+      );
+    }
   }
 
   /**
@@ -416,8 +855,35 @@ export class AttendanceService {
         'That employee does not exist',
       );
     }
+    // Only a manager acting for somebody else may touch an exited employee's
+    // record. Naming your own id must not skip the check.
+    const forSomeoneElse = employeeId !== undefined && employeeId !== user.employeeId;
+    if (employee.status === 'EXITED' && !forSomeoneElse) {
+      throw DomainError.conflict(
+        ERROR_CODES.ATTENDANCE_EMPLOYEE_EXITED,
+        'This employee record is no longer active',
+      );
+    }
     return employee;
   }
+}
+
+// A manager sets the time of a correction, but attendance cannot be in the
+// future. A minute of allowance covers a manager's clock running ahead.
+const FUTURE_ALLOWANCE_MS = 60_000;
+
+function assertNotFuture(at: Date): void {
+  if (at.getTime() > Date.now() + FUTURE_ALLOWANCE_MS) {
+    throw DomainError.badRequest(
+      ERROR_CODES.ATTENDANCE_FUTURE_PUNCH,
+      'A punch cannot be set in the future',
+    );
+  }
+}
+
+/** Today plus the previous 364 business dates (SRS Amendment v1.1 A7). */
+function rollingWindowStart(): string {
+  return businessDateOffset(-(ATTENDANCE_WINDOW_DAYS - 1)).toISOString().slice(0, 10);
 }
 
 /** Sums IN/OUT pairs. A trailing unmatched IN contributes nothing until closed. */

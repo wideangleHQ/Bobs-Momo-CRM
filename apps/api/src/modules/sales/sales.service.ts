@@ -62,7 +62,7 @@ export class SalesService {
       outletId: { in: scope.outletIds },
       businessDate: { gte: dayUtc(from), lte: dayUtc(to) },
     };
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.dailySalesEntry.findMany({
         where,
         include: ENTRY_INCLUDE,

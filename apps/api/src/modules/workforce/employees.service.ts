@@ -40,7 +40,7 @@ export class EmployeesService {
         : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.employee.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

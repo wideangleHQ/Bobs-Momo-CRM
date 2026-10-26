@@ -138,6 +138,11 @@ export const resolvers: Record<EventKey, Resolver> = {
 
   LEAVE_DECIDED: (p, db) => userForEmployee(db, str(p, 'employeeId')),
 
+  // Only the outlet Store Manager can act on a submission, so nobody else is told.
+  ATTENDANCE_SUBMITTED: (p, db) => usersWithRole(db, 'STORE_MANAGER', str(p, 'outletId')),
+
+  ATTENDANCE_DECIDED: (p, db) => userForEmployee(db, str(p, 'employeeId')),
+
   // Purchasing is centralised across both outlets, so no outlet filter.
   PURCHASE_REQUESTED: (_p, db) => usersWithRole(db, 'PURCHASE_MANAGER', null),
 

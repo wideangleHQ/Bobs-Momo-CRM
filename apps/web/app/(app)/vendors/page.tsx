@@ -62,7 +62,7 @@ export default function VendorsPage() {
       </div>
 
       {/* ── SEARCH & FILTER CONTROLS ───────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-zinc-200/80 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-zinc-200/80 shadow-sm">
         <div className="flex-1 max-w-md">
           <TextInput
             type="search"
@@ -101,7 +101,7 @@ export default function VendorsPage() {
       {vendors.isPending ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-44 w-full rounded-xl" />
           ))}
         </div>
       ) : vendors.isError ? (
@@ -124,7 +124,7 @@ export default function VendorsPage() {
             {vendors.data.data.map((v) => (
               <div
                 key={v.id}
-                className="group relative flex flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-zinc-300"
+                className="group relative flex flex-col justify-between rounded-xl border border-zinc-200/80 bg-white p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-zinc-300"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-3">

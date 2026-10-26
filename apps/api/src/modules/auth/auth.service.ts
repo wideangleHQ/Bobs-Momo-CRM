@@ -96,7 +96,7 @@ export class AuthService {
     // Prepare JWT and refresh token outside the transaction — JWT signing and
     // outlet-cache resolution are CPU/network work that must not hold a DB
     // connection open (Prisma's default 5s interactive-transaction timeout).
-    const prepared = await this.prepareTokenPair(user, familyId);
+    const prepared = await this.prepareTokenPair(user);
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -119,7 +119,7 @@ export class AuthService {
 
   async refresh(presented: string, ctx: RequestCtx): Promise<TokenPair> {
     const tokenHash = sha256(presented);
-    const row = await this.repo.findRefreshToken(tokenHash);
+    const row = await this.repo.findRefreshTokenWithUser(tokenHash);
 
     if (!row) throw this.tokenError(ERROR_CODES.AUTH_TOKEN_INVALID, 'Sign in again');
     if (row.expiresAt < new Date()) {
@@ -149,8 +149,8 @@ export class AuthService {
       throw this.tokenError(ERROR_CODES.AUTH_TOKEN_REUSED, 'Sign in again');
     }
 
-    const user = (await this.repo.findUserById(row.userId)) as UserWithScope | null;
-    if (!user || user.status !== 'ACTIVE') {
+    const user = row.user as UserWithScope;
+    if (user.status !== 'ACTIVE') {
       throw new DomainError(
         HttpStatus.FORBIDDEN,
         ERROR_CODES.AUTH_ACCOUNT_DISABLED,
@@ -158,7 +158,7 @@ export class AuthService {
       );
     }
 
-    const prepared = await this.prepareTokenPair(user, row.familyId);
+    const prepared = await this.prepareTokenPair(user);
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -225,7 +225,7 @@ export class AuthService {
     const familyId = randomUUID();
     // A fresh session so the user is not bounced to login the moment they set a
     // password. Prepare outside the transaction for the same reason as login().
-    const prepared = await this.prepareTokenPair({ ...user, mustReset: false }, familyId);
+    const prepared = await this.prepareTokenPair({ ...user, mustReset: false });
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -322,7 +322,6 @@ export class AuthService {
 
   private async prepareTokenPair(
     user: UserWithScope,
-    familyId: string,
   ): Promise<{ pair: TokenPair; tokenHash: string; expiresAt: Date }> {
     const { outletIds, scope } = await this.resolveScope(user);
     const accessToken = await this.tokens.signAccess({

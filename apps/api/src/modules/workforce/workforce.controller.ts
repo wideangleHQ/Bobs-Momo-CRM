@@ -20,7 +20,11 @@ import {
   decideLeaveSchema,
   editPunchSchema,
   exitEmployeeSchema,
+  attendanceSummaryQuery,
   listAttendanceQuery,
+  rejectAttendanceSchema,
+  verificationQueueQuery,
+  verifyAttendanceSchema,
   listEmployeesQuery,
   listLeaveQuery,
   listShiftsQuery,
@@ -35,7 +39,11 @@ import {
   type DecideLeaveDto,
   type EditPunchDto,
   type ExitEmployeeDto,
+  type AttendanceSummaryQuery,
   type ListAttendanceQuery,
+  type RejectAttendanceDto,
+  type VerificationQueueQuery,
+  type VerifyAttendanceDto,
   type ListEmployeesQuery,
   type ListLeaveQuery,
   type ListShiftsQuery,
@@ -173,6 +181,49 @@ export class WorkforceController {
     @Scope() scope: RequestScope,
   ) {
     return this.attendance.list(query, scope);
+  }
+
+  @Get('attendance/summary')
+  @Permissions('workforce.attendance.read')
+  attendanceSummary(
+    @Query(new ZodValidationPipe(attendanceSummaryQuery)) query: AttendanceSummaryQuery,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.summary(query, scope);
+  }
+
+  @Get('attendance/verification-queue')
+  @Permissions('workforce.attendance.verify')
+  verificationQueue(
+    @Query(new ZodValidationPipe(verificationQueueQuery)) query: VerificationQueueQuery,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.verificationQueue(query, user, scope);
+  }
+
+  @Post('attendance/days/:id/verify')
+  @Permissions('workforce.attendance.verify')
+  @HttpCode(HttpStatus.OK)
+  verifyAttendance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(verifyAttendanceSchema)) dto: VerifyAttendanceDto,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.decide(id, 'VERIFIED', dto.note, user, scope);
+  }
+
+  @Post('attendance/days/:id/reject')
+  @Permissions('workforce.attendance.verify')
+  @HttpCode(HttpStatus.OK)
+  rejectAttendance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(rejectAttendanceSchema)) dto: RejectAttendanceDto,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.decide(id, 'REJECTED', dto.reason, user, scope);
   }
 
   @Patch('attendance/punches/:id')

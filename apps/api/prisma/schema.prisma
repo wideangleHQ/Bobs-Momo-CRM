@@ -106,6 +106,9 @@ model Employee {
   joinedOn     DateTime         @db.Date
   exitedOn     DateTime?        @db.Date
   status       EmploymentStatus @default(ACTIVE)
+  // false = this record is excluded from attendance, task assignment and employee
+  // reporting without deleting it. Set only by the Owner; history is untouched.
+  eligibleForWorkflows Boolean   @default(true)
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   attendance   AttendanceDay[]

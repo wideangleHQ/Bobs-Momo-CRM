@@ -15,7 +15,19 @@ const DENY_LIST = new Set([
   'password', 'password1', 'password123', '1234567890', 'qwertyuiop',
   'bobsmomo', 'bobsmomo123', 'momo123456', 'admin12345', 'welcome123',
   'changeme123', 'iloveyou123', 'letmein123', 'abcd123456',
+  // The initial employee password (policy A). It is public to everyone who
+  // creates or receives an account, so it can never be chosen as a real one.
+  'password1234',
 ]);
+
+/**
+ * Policy A, as requested by the business: every new employee account starts with
+ * this password and must change it before doing anything else. A shared default
+ * is weaker than a unique one (usernames are sequential, so it is guessable until
+ * first login). It lives in exactly one place so the policy can be switched to a
+ * unique temporary password by changing initialEmployeePassword() alone.
+ */
+const INITIAL_EMPLOYEE_PASSWORD = 'password1234';
 
 const WORDS = [
   'momo', 'steam', 'chilli', 'ginger', 'kite', 'river', 'mango', 'copper',
@@ -47,6 +59,10 @@ export class PasswordService {
   async burnTime(plain: string): Promise<void> {
     this.dummyHash ??= await this.hash('dummy-password-for-timing-parity');
     await this.verify(this.dummyHash, plain);
+  }
+
+  initialEmployeePassword(): string {
+    return INITIAL_EMPLOYEE_PASSWORD;
   }
 
   /** Returns a reason when the password is unusable, null when it is fine. */

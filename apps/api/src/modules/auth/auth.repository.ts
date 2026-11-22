@@ -5,6 +5,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 type Tx = Prisma.TransactionClient;
 
 // Queries only. Every decision about what a null row means belongs in the service.
+// What a login needs to know about the employee row behind an account.
+const EMPLOYEE_FIELDS = {
+  id: true,
+  fullName: true,
+  status: true,
+  eligibleForWorkflows: true,
+} as const;
+
 @Injectable()
 export class AuthRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,14 +23,14 @@ export class AuthRepository {
       : { username: identifier.toLowerCase() };
     return this.prisma.user.findUnique({
       where,
-      include: { employee: { select: { id: true, fullName: true } }, outlets: true },
+      include: { employee: { select: EMPLOYEE_FIELDS }, outlets: true },
     });
   }
 
   findUserById(id: string) {
     return this.prisma.user.findUnique({
       where: { id },
-      include: { employee: { select: { id: true, fullName: true } }, outlets: true },
+      include: { employee: { select: EMPLOYEE_FIELDS }, outlets: true },
     });
   }
 

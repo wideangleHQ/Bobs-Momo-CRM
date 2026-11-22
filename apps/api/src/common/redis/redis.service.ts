@@ -80,6 +80,31 @@ export class RedisService implements OnModuleDestroy {
     }
   }
 
+  /**
+   * Atomic counter whose window starts at its first hit. Returns the new count,
+   * or 0 when Redis is unreachable so a Redis outage never locks everyone out of
+   * logging in (a limiter that fails closed is an outage of its own).
+   */
+  async incr(key: string, ttlSeconds: number): Promise<number> {
+    if (!this.client) {
+      const hit = this.local.get(key);
+      const live = hit && hit.expiresAt > Date.now() ? hit : null;
+      const next = (live ? Number(live.value) : 0) + 1;
+      this.local.set(key, {
+        value: String(next),
+        expiresAt: live ? live.expiresAt : Date.now() + ttlSeconds * 1000,
+      });
+      return next;
+    }
+    try {
+      const n = await this.client.incr(key);
+      if (n === 1) await this.client.expire(key, ttlSeconds);
+      return n;
+    } catch {
+      return 0;
+    }
+  }
+
   async del(...keys: string[]): Promise<void> {
     if (keys.length === 0) return;
     if (!this.client) {

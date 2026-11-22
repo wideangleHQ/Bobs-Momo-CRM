@@ -44,6 +44,10 @@ if (!loadedFromEnv.skip && process.env['ALLOW_REMOTE_TEST_DB'] !== '1') {
   }
 }
 
+// Every suite signs in from the same address, and several deliberately fail.
+// login-rate-limit.e2e.test.ts is run on its own with a small limit instead.
+process.env['LOGIN_IP_FAILURE_LIMIT'] ??= '100000';
+
 // Cron jobs firing under test would race the assertions.
 process.env['JOBS_ENABLED'] ??= 'false';
 

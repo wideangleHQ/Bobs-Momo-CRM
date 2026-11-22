@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from '@/lib/auth';
+import { homePath, useSession } from '@/lib/auth';
 import { errorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardBody } from '@/components/ui/card';
@@ -33,8 +33,8 @@ export default function ChangePasswordPage() {
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (done && !mustReset) router.replace('/dashboard');
-  }, [done, mustReset, router]);
+    if (done && !mustReset && user) router.replace(homePath(user));
+  }, [done, mustReset, user, router]);
 
   if (loading || !user) {
     return (

@@ -21,6 +21,17 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v === 'true'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  // Failed sign-ins per client address per 15 minutes before further attempts are
+  // refused. The test runner raises it so one suite's wrong-password tests cannot
+  // throttle the next; production uses the default.
+  LOGIN_IP_FAILURE_LIMIT: z.coerce.number().int().positive().default(20),
+  // Connections the main Prisma client may hold. Applied only when DATABASE_URL has
+  // no connection_limit of its own. Unset: 5 in production, 10 under test (local
+  // Postgres has no cap), 3 otherwise. The Supabase Session Pooler allows 15 for
+  // the whole project, shared by every process pointed at it.
+  DB_POOL_SIZE: z.coerce.number().int().positive().optional(),
+  // Seconds a query waits for a free pooled connection before failing.
+  DB_POOL_TIMEOUT_S: z.coerce.number().int().positive().default(20),
   SLOW_REQUEST_MS: z.coerce.number().int().positive().default(1000),
   SLOW_QUERY_MS: z.coerce.number().int().positive().default(300),
 });
@@ -40,7 +51,20 @@ export function env(): Env {
     throw new Error(`Invalid environment:\n${issues}`);
   }
   cached = parsed.data;
+  // Every suite signs in from one address and several fail on purpose, so the
+  // limiter is effectively off under `bun test` unless a test sets its own limit.
+  if (cached.NODE_ENV === 'test' && process.env['LOGIN_IP_FAILURE_LIMIT'] === undefined) {
+    cached.LOGIN_IP_FAILURE_LIMIT = 100_000;
+  }
   return cached;
+}
+
+/** Pool size for the main Prisma client. See DB_POOL_SIZE above for the budget. */
+export function dbPoolSize(): number {
+  const e = env();
+  if (e.DB_POOL_SIZE !== undefined) return e.DB_POOL_SIZE;
+  if (e.NODE_ENV === 'production' || e.NODE_ENV === 'staging') return 5;
+  return e.NODE_ENV === 'test' ? 10 : 3;
 }
 
 export function corsOrigins(): string[] {

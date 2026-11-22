@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { createEmployeeSchema, updateEmployeeSchema } from '@bobs-momo/shared';
+import { ROLE_KEYS, createEmployeeSchema, updateEmployeeSchema } from '@bobs-momo/shared';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import type { Employee } from '@/features/workforce/api';
+import { ROLE_LABELS } from '@/features/workforce/roles';
 
 export interface OutletOption {
   outletId: string;
@@ -31,6 +32,7 @@ export function EmployeeForm({ outlets, employee, pending, problem, onSubmit, on
   const [outletId, setOutletId] = useState(employee?.outletId ?? outlets[0]?.outletId ?? '');
   const [departmentId, setDepartmentId] = useState(employee?.departmentId ?? '');
   const [designation, setDesignation] = useState(employee?.designation ?? '');
+  const [roleKey, setRoleKey] = useState<string>('KITCHEN_STAFF');
   const [joinedOn, setJoinedOn] = useState(
     employee?.joinedOn ?? new Date().toISOString().slice(0, 10),
   );
@@ -47,7 +49,7 @@ export function EmployeeForm({ outlets, employee, pending, problem, onSubmit, on
       outletId,
       departmentId: departmentId === '' ? null : departmentId,
       ...(designation.trim() === '' ? {} : { designation: designation.trim() }),
-      ...(editing ? {} : { joinedOn }),
+      ...(editing ? {} : { joinedOn, roleKey }),
     };
     const parsed = editing
       ? updateEmployeeSchema.safeParse(raw)
@@ -122,6 +124,22 @@ export function EmployeeForm({ outlets, employee, pending, problem, onSubmit, on
             onChange={(e) => setDesignation(e.target.value)}
           />
         </div>
+
+        {editing ? null : (
+          <div className="space-y-1">
+            <Label htmlFor="roleKey">Role of their login</Label>
+            <Select id="roleKey" value={roleKey} onChange={(e) => setRoleKey(e.target.value)}>
+              {ROLE_KEYS.filter((r) => r !== 'OWNER').map((r) => (
+                <option key={r} value={r}>
+                  {ROLE_LABELS[r]}
+                </option>
+              ))}
+            </Select>
+            <p className="text-sm text-text-muted">
+              A username is generated for you when you save. You cannot choose or edit it.
+            </p>
+          </div>
+        )}
 
         {editing ? null : (
           <div className="space-y-1">

@@ -967,3 +967,19 @@ Two routes exist with no requirement behind them at all: `/reports` (an index,
 pure navigation) and `/notifications` settings beyond the FR-NOTIF-001 dispatch
 rules. Neither is a scope risk. Everything else either cites an FR or names the
 gap it fills.
+
+## Screens affected by Amendment 1.2 (draft)
+
+> **Amendment 1.2 (draft, pending approval)**. This list is for planning. No screen has been changed.
+
+| Screen | What would change after approval |
+|---|---|
+| `/login` | One page for everyone today. Whether employees get a separate entry point is decision G. |
+| `/change-password` | Already forced by `mustReset`. Behaviour unchanged. |
+| `/employees/new` | Would become the single Add Employee form that also creates the login. No username field. Shows the generated username once. |
+| `/employees`, `/employees/[id]` | Would show the generated username and account status, and offer a confirmed password reset. Counts must exclude dashboard-only accounts. |
+| `/admin/users/new` | Creates dashboard accounts. Would stop being a way to create employee logins, and its username field would not apply to employee accounts. |
+| `/attendance`, `/attendance/board` | No code change expected; the board lists employee rows, so the effect comes from reclassifying the role-named accounts (decision C). |
+| `/tasks/new` and assignee pickers | Same: eligibility follows the employee row. |
+
+Detail: [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).

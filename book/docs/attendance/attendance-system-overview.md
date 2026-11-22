@@ -144,3 +144,7 @@ Attendance module
 When an employee moves outlets, historical records keep the old outletId. The live
 board and history endpoints both read `AttendanceDay.outletId`, not
 `Employee.outletId`.
+
+## Employee eligibility (Amendment 1.2, draft)
+
+Attendance attaches to an individual employee record, never to a shared dashboard login. A login with no employee row cannot punch, and using a Counter Cashier dashboard does not create attendance. Which employment statuses count as eligible is not the same in every place today (the live board uses `ACTIVE`; a self punch refuses only `EXITED`) and is open (decision E). All thirteen role-named logins created by the provisioning script currently have their own employee rows, so they appear on the board. See the [identity analysis](../identity/employee-identity-and-dashboard-accounts.md).

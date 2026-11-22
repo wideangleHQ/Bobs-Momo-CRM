@@ -51,6 +51,10 @@
 - [Attendance implementation audit](../docs/attendance/attendance-implementation-audit.md)
 - [Attendance open decisions](../docs/attendance/attendance-open-decisions.md)
 
+# Part VI-B: Employee identity (Amendment 1.2, draft)
+
+- [Employee identity and dashboard accounts](../docs/identity/employee-identity-and-dashboard-accounts.md)
+
 # Part VII: Automation and communication
 
 - [Notification engine](21-notification-engine.md)

@@ -13,6 +13,7 @@ let app: INestApplication;
 let url: string;
 
 let hrToken: string; // HR_ACCOUNTS: employees, salary, leave decisions
+let ownerToken: string; // OWNER: the only role that adds employees
 let mgrToken: string; // STORE_MANAGER: shifts, attendance edit, leave decisions
 let staffToken: string; // KITCHEN_STAFF: punch, break, own leave only
 let outletId: string;
@@ -38,6 +39,7 @@ const north = (metres: number) => ({
 
 const PASSWORD = 'saheed-momo-2026';
 const HR = 'e2e.wf.hr';
+const OWNER = 'e2e.wf.owner';
 const MGR = 'e2e.wf.mgr';
 const STAFF = 'e2e.wf.staff';
 const MGR2 = 'e2e.wf.mgr2'; // STORE_MANAGER who is also an employee
@@ -69,22 +71,26 @@ function idem(): Record<string, string> {
 
 async function cleanup(): Promise<void> {
   const users = await prisma.user.findMany({
-    where: { username: { in: [HR, MGR, STAFF, MGR2, MGR_OTHER] } },
+    where: { username: { in: [HR, OWNER, MGR, STAFF, MGR2, MGR_OTHER] } },
     select: { id: true },
   });
   const ids = users.map((u) => u.id);
   const employees = await prisma.employee.findMany({
     where: { OR: [{ userId: { in: ids } }, { fullName: { startsWith: 'E2E WF' } }] },
-    select: { id: true },
+    select: { id: true, userId: true },
   });
   const empIds = employees.map((e) => e.id);
+  // An employee created through the API has its own generated login too.
+  const ownLogins = employees.flatMap((e) => (e.userId ? [e.userId] : []));
 
   await prisma.attendanceDay.deleteMany({ where: { employeeId: { in: empIds } } });
   await prisma.shift.deleteMany({ where: { employeeId: { in: empIds } } });
   await prisma.leaveRequest.deleteMany({ where: { employeeId: { in: empIds } } });
   await prisma.salaryRecord.deleteMany({ where: { employeeId: { in: empIds } } });
   await prisma.employee.deleteMany({ where: { id: { in: empIds } } });
-  await prisma.user.deleteMany({ where: { username: { in: [HR, MGR, STAFF, MGR2, MGR_OTHER] } } });
+  await prisma.user.deleteMany({
+    where: { OR: [{ username: { in: [HR, OWNER, MGR, STAFF, MGR2, MGR_OTHER] } }, { id: { in: ownLogins } }] },
+  });
 }
 
 beforeAll(async () => {
@@ -113,7 +119,10 @@ beforeAll(async () => {
   });
   departmentId = department.id;
 
-  const mk = async (username: string, roleKey: 'HR_ACCOUNTS' | 'STORE_MANAGER' | 'KITCHEN_STAFF') => {
+  const mk = async (
+    username: string,
+    roleKey: 'HR_ACCOUNTS' | 'STORE_MANAGER' | 'KITCHEN_STAFF' | 'OWNER',
+  ) => {
     const user = await prisma.user.create({
       data: { username, passwordHash: hash, roleKey, mustReset: false },
     });
@@ -121,6 +130,7 @@ beforeAll(async () => {
     return user;
   };
   await mk(HR, 'HR_ACCOUNTS');
+  await mk(OWNER, 'OWNER');
   await mk(MGR, 'STORE_MANAGER');
   const staffUser = await mk(STAFF, 'KITCHEN_STAFF');
 
@@ -146,6 +156,7 @@ beforeAll(async () => {
     return ((await res.json()) as { accessToken: string }).accessToken;
   };
   hrToken = await login(HR);
+  ownerToken = await login(OWNER);
   mgrToken = await login(MGR);
   staffToken = await login(STAFF);
 });
@@ -162,17 +173,43 @@ afterAll(async () => {
 describe('employees', () => {
   let createdId: string;
 
-  test('HR creates an employee and the code is allocated', async () => {
-    const res = await api('POST', '/employees', {
-      fullName: 'E2E WF Helper',
-      phone: '9937999002',
-      outletId,
-      departmentId,
-      joinedOn: toBusinessDate(),
-    });
+  test('HR can no longer add an employee: creation is the Owners alone', async () => {
+    const res = await api(
+      'POST',
+      '/employees',
+      {
+        fullName: 'E2E WF Refused',
+        phone: '9937999009',
+        outletId,
+        departmentId,
+        joinedOn: toBusinessDate(),
+        roleKey: 'KITCHEN_STAFF',
+      },
+      hrToken,
+      idem(),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  test('the Owner creates an employee with a login and the code is allocated', async () => {
+    const res = await api(
+      'POST',
+      '/employees',
+      {
+        fullName: 'E2E WF Helper',
+        phone: '9937999002',
+        outletId,
+        departmentId,
+        joinedOn: toBusinessDate(),
+        roleKey: 'KITCHEN_STAFF',
+      },
+      ownerToken,
+      idem(),
+    );
     expect(res.status).toBe(201);
-    expect(String(res.body?.['employeeCode'])).toMatch(/^BM-EMP-\d{4}$/);
-    createdId = res.body?.['id'] as string;
+    const employee = res.body?.['employee'] as Record<string, unknown>;
+    expect(String(employee['employeeCode'])).toMatch(/^BM-EMP-\d{4}$/);
+    createdId = employee['id'] as string;
   });
 
   test('a department from the other outlet is refused', async () => {

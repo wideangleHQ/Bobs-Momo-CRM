@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { EMPLOYEE_USERNAME_PATTERN } from './employee-identity';
 import { ROLE_KEYS } from './enums';
 import { businessDateSchema, uuidSchema } from './inventory';
 import { pageQuerySchema } from './pagination';
@@ -38,7 +39,13 @@ const usernameSchema = z
   .toLowerCase()
   .min(3)
   .max(40)
-  .regex(/^[a-z0-9._-]+$/, 'Letters, digits, dot, dash and underscore only');
+  .regex(/^[a-z0-9._-]+$/, 'Letters, digits, dot, dash and underscore only')
+  // BMEMP#### belongs to the generator. A typed one could collide with a number
+  // the sequence has not issued yet.
+  .refine(
+    (v) => !EMPLOYEE_USERNAME_PATTERN.test(v),
+    'BMEMP usernames are generated for employees and cannot be typed',
+  );
 
 const emailSchema = z.string().trim().toLowerCase().email().max(160);
 const reasonSchema = z.string().trim().min(3).max(280);

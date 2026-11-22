@@ -25,6 +25,21 @@ function isDomainShape(v: unknown): v is DomainErrorShape {
   );
 }
 
+/**
+ * The database could not serve this request: pool exhausted, unreachable, or
+ * refused by the Supabase pooler (EMAXCONNSESSION arrives as an unknown request
+ * error with no code). Retrying shortly is correct, so this is a 503 rather than
+ * the 500 that tells a client nothing.
+ */
+const UNAVAILABLE_PRISMA_CODES = new Set(['P2024', 'P1001', 'P1002', 'P1008', 'P1017']);
+
+function isDatabaseUnavailable(e: unknown): boolean {
+  if (e instanceof Prisma.PrismaClientInitializationError) return true;
+  if (e instanceof Prisma.PrismaClientKnownRequestError) return UNAVAILABLE_PRISMA_CODES.has(e.code);
+  if (e instanceof Prisma.PrismaClientUnknownRequestError) return /EMAXCONN|max clients reached/i.test(e.message);
+  return false;
+}
+
 const STATUS_TO_CODE: Record<number, string> = {
   400: ERROR_CODES.COMMON_VALIDATION_FAILED,
   401: ERROR_CODES.AUTH_INVALID_CREDENTIALS,
@@ -62,6 +77,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       } else if (typeof body === 'object' && body !== null && 'message' in body) {
         message = String((body as { message: unknown }).message);
       }
+    } else if (isDatabaseUnavailable(exception)) {
+      status = HttpStatus.SERVICE_UNAVAILABLE;
+      code = ERROR_CODES.COMMON_UNAVAILABLE;
+      message = 'The service is busy. Please try again in a moment.';
+      res.setHeader('Retry-After', '2');
     } else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
       // P2002 unique violation, P2025 record not found. Everything else is ours.
       if (exception.code === 'P2002') {

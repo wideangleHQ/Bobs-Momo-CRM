@@ -223,8 +223,8 @@ export default function AttendancePunchPage() {
       <div className="space-y-4 p-4">
         <PageHeader title="Attendance" />
         <EmptyState
-          title="This login is not linked to an employee record"
-          description="Ask an administrator to link your account to your employee profile before you punch in."
+          title="This login is not an employee account"
+          description="Attendance and tasks belong to your own employee login. Sign out and use Employee sign in with your own username. If you do not have one yet, ask the Owner."
         />
       </div>
     );

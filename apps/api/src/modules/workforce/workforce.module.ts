@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PasswordService } from '../auth/password.service';
 import { AttendanceService } from './attendance.service';
 import { EmployeesService } from './employees.service';
 import { LeaveService } from './leave.service';
@@ -11,7 +12,14 @@ import { WorkforceController } from './workforce.controller';
 // so splitting them into five NestJS modules would buy nothing but imports.
 @Module({
   controllers: [WorkforceController],
-  providers: [EmployeesService, AttendanceService, ShiftsService, LeaveService, SalaryService],
+  providers: [
+    EmployeesService,
+    AttendanceService,
+    ShiftsService,
+    LeaveService,
+    SalaryService,
+    PasswordService,
+  ],
   exports: [AttendanceService, EmployeesService],
 })
 export class WorkforceModule {}

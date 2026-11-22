@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from '@/lib/auth';
+import { homePath, useSession } from '@/lib/auth';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
@@ -17,7 +17,7 @@ export default function Home() {
     if (loading) return;
     if (!user) router.replace('/login');
     else if (mustReset) router.replace('/change-password');
-    else router.replace('/dashboard');
+    else router.replace(homePath(user));
   }, [user, loading, mustReset, router]);
 
   return (

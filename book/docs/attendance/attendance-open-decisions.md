@@ -118,3 +118,7 @@ Newly open or still open after Phase 2:
 | OD-R004 | Is payroll computation in scope? | SRS v1.0 decision; book ch.19 ADR-006 | Salary storage only; no payroll computation in Phase 1. |
 | OD-R005 | How many approval stages for leave? | SRS v1.0 Section 9; Feature List 6.2 | Single manager decision only. No second approval layer. |
 | OD-R006 | Does REJECTED leave history block resubmission? | `leave.service.ts` overlap check (verified in code) | Rejected and cancelled leave does NOT block resubmission for the same dates. |
+
+## Cross-reference: employee identity decisions
+
+Decisions A to G in the [identity analysis](../identity/employee-identity-and-dashboard-accounts.md) (initial password, username convention, existing account classification, shared dashboard accountability, Owner scope, employee-account role, login entry points) affect who appears in attendance. Decision C (classifying the existing role-named accounts) and the single eligibility-status rule in decision E decide whether the cashier and similar accounts stay on the attendance board.

@@ -95,6 +95,13 @@ would be dishonest.
 | Elevation of privilege | A new endpoint ships without a permission decorator and defaults to open. | The table-driven RBAC test in [chapter 33](33-testing-strategy.md) fails the build on any undecorated route. | `test/rbac/route-matrix.e2e-spec.ts` |
 | Elevation of privilege | A STORE_MANAGER assigns themselves the OWNER role. | `admin.user.role_change` requires a permission only OWNER holds, and the action is audited with before and after. | `modules/users/users.service.ts` |
 
+> **Amendment 1.2 (draft, pending approval)** **qualifies the shared-login row above.** The amendment deliberately allows
+> a shared *operational dashboard* account (for example a Counter Cashier counter
+> login) while keeping personal functions on an individual employee account. The
+> threat remains real for that shared account: it identifies the counter, not the
+> person. The "one user per employee" control still holds for employee accounts. See
+> decision D in the [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).
+
 ## Transport and headers
 
 HTTPS everywhere. Railway terminates TLS and issues certificates for both custom

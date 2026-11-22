@@ -213,6 +213,12 @@ INVENTORY_MANAGER". Users are created by `admin.user.create`, updated by admins
 and by the user's own password change, and never deleted. Disabling sets
 `status = DISABLED` and revokes refresh tokens.
 
+> **Amendment 1.2 (draft, pending approval)** **affects the `username` row.** The table above describes a typed
+> `firstname.lastname` handle. The amendment proposes system-generated employee
+> usernames of the form `BMEMP0001`, never typed by the Owner and never edited. No
+> schema change is approved. Open points (case, relation to `employeeCode`) are in
+> decision B of the [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).
+
 ### UserOutlet
 
 A two column join table, `userId` and `outletId`, forming the composite primary

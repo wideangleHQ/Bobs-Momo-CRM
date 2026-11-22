@@ -1164,3 +1164,14 @@ Permission and metric tests:
 | `undated task is excluded from on-time rate` | Denominator unchanged |
 | `approved leave is excluded from attendance consistency` | Five scheduled days, two on approved leave, three present gives 1.0 |
 | `half day counts as 0.5` | Two present, one half day, three scheduled gives 0.833 |
+
+## Assignee eligibility (Amendment 1.2, draft)
+
+> **Amendment 1.2 (draft, pending approval)**. Nothing here is built.
+
+A task is assigned to an `Employee` row, never to a login. A shared dashboard account
+(for example a Counter Cashier counter login) has no employee row and so can neither
+receive nor create tasks; that is intended. Today assignment is allowed for employees
+whose status is `ACTIVE` or `ON_NOTICE`, while the attendance board and performance
+analytics use `ACTIVE` only. The amendment asks for one eligibility rule across all
+of them; the choice is part of decision E. See the [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).

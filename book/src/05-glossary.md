@@ -9,7 +9,12 @@ these terms, it means what this page says it means.
 | Term | Definition as used in this system |
 |---|---|
 | QSR | Quick service restaurant. A counter-service food outlet with fast order turnaround, no table service and two heavy demand peaks per day. The operating pattern, not the cuisine, is what drives the design: nothing gets entered into the system between 12:00 and 14:00 or between 18:00 and 21:00 |
-| Outlet | One physical restaurant location, modelled as `Outlet` with a unique `code` such as `BM-SAHEED` or `BM-PATIA`. The outlet is the primary scoping boundary for almost all operational data. Stock, tasks, shifts, purchases and sales all belong to exactly one outlet |
+| Outlet | One physical restaurant location, modelled as `Outlet` with a unique `code` such as `BM-SAHEED` or `BM-PATIA`. The outlet is the primary scoping boundary for almost all operational data. Stock, tasks, shifts, purchases and sales all belong to exactly one outlet |
+| User account (draft, Amendment 1.2) | A credential identity: username, hashed password, status and role. It says who signed in, not that the signer is an employee. |
+| Employee record (draft, Amendment 1.2) | One individual person in the employee directory. Attendance, shifts, leave and task assignment attach to it. |
+| Employee account (draft, Amendment 1.2) | A user account that belongs to exactly one employee record and is used by that person only. |
+| Operational dashboard account (draft, Amendment 1.2) | A user account used to reach an operational interface such as the Counter Cashier dashboard. It may be shared, represents the counter rather than a person, and has no employee record. |
+| Employee eligibility (draft, Amendment 1.2) | Whether an employee record is included in attendance, task assignment and employee reporting. Decided by the employee record and its status, never by a role name. |
 | Department | A grouping inside an outlet: Kitchen, Counter, Store or Admin. Modelled as `Department`, unique per outlet by name. Tasks and broadcasts can be addressed to a department, so "Kitchen at Patia" is an addressable audience |
 | Trading day | The human description of one day of operation, from opening prep around 07:00 to close around 23:30, including the paperwork that lands after midnight. The system's machine-readable version of this is the business date |
 | Business date | A calendar date in Asia/Kolkata, stored as `@db.Date`, that a record belongs to operationally. Stored on `StockTransaction`, `AttendanceDay`, `Task`, `Shift`, `DailySalesEntry` and `Purchase`. It is not the same as the row's `createdAt` timestamp, which is UTC and records when the row was written |

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ROLE_KEYS } from './enums';
 import { pageQuerySchema } from './pagination';
 import { businessDateSchema, uuidSchema } from './inventory';
 import { moneySchema } from './purchase';
@@ -30,16 +31,29 @@ export const createEmployeeSchema = z
     departmentId: uuidSchema.nullish(),
     designation: z.string().trim().max(80).optional(),
     joinedOn: businessDateSchema,
-    userId: uuidSchema.nullish(),
+    // The role of the employee's own login. The username is never part of this
+    // request: the server generates it, and `.strict()` refuses one if sent.
+    roleKey: z
+      .enum(ROLE_KEYS)
+      .refine((r) => r !== 'OWNER', 'The Owner role is not handed out from Add Employee'),
   })
   .strict();
 export type CreateEmployeeDto = z.infer<typeof createEmployeeSchema>;
 
+// No roleKey, userId or username here: an employee's login is created once with
+// the employee, and re-linking or renaming it is not an ordinary profile edit.
+// EXITED is reached only through the exit endpoint, which also ends the login.
 export const updateEmployeeSchema = createEmployeeSchema
   .partial()
-  .omit({ joinedOn: true })
+  .omit({ joinedOn: true, roleKey: true })
+  .extend({ status: z.enum(['ACTIVE', 'ON_NOTICE']).optional() })
   .strict();
 export type UpdateEmployeeDto = z.infer<typeof updateEmployeeSchema>;
+
+export const setEligibilitySchema = z
+  .object({ eligible: z.boolean(), reason: z.string().trim().min(3).max(280) })
+  .strict();
+export type SetEligibilityDto = z.infer<typeof setEligibilitySchema>;
 
 export const exitEmployeeSchema = z
   .object({ exitedOn: businessDateSchema, reason: z.string().trim().min(3).max(280) })

@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   ATTENDANCE_WINDOW_DAYS,
+  ELIGIBLE_EMPLOYMENT_STATUSES,
   ERROR_CODES,
   businessDateOffset,
   paginate,
@@ -429,7 +430,10 @@ export class AttendanceService {
     const employees = await this.prisma.employee.findMany({
       where: {
         outletId: { in: scope.outletIds },
-        status: 'ACTIVE',
+        // The same rule as task assignment and employee analytics. It reads the
+        // employee record only: no role decides who appears on this board.
+        status: { in: [...ELIGIBLE_EMPLOYMENT_STATUSES] },
+        eligibleForWorkflows: true,
         ...(scope.selfEmployeeId ? { id: scope.selfEmployeeId } : {}),
       },
       orderBy: { fullName: 'asc' },
@@ -862,6 +866,15 @@ export class AttendanceService {
       throw DomainError.conflict(
         ERROR_CODES.ATTENDANCE_EMPLOYEE_EXITED,
         'This employee record is no longer active',
+      );
+    }
+    // A record the Owner has excluded from attendance (for example the employee
+    // row behind a shared dashboard account) takes no punches, from the account
+    // itself or from a manager. Its history stays readable.
+    if (!employee.eligibleForWorkflows) {
+      throw DomainError.conflict(
+        ERROR_CODES.EMPLOYEE_NOT_ELIGIBLE,
+        'This record is not part of attendance',
       );
     }
     return employee;

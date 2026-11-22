@@ -67,11 +67,31 @@ export function dbPoolSize(): number {
   return e.NODE_ENV === 'test' ? 10 : 3;
 }
 
-export function corsOrigins(): string[] {
-  return env()
-    .CORS_ORIGINS.split(',')
-    .map((s) => s.trim())
+/**
+ * The browser sends Origin as scheme://host[:port] with no path and no trailing
+ * slash, and the cors middleware compares it byte for byte. A value pasted into a
+ * dashboard as `https://crm.example.com/` or with surrounding quotes or spaces
+ * would match nothing and the preflight would come back with no
+ * Access-Control-Allow-Origin, so each entry is normalised first.
+ * A wildcard is refused outright: credentials are on, and the browser rejects `*`
+ * with credentials anyway.
+ */
+export function parseCorsOrigins(raw: string): string[] {
+  const origins = raw
+    .split(',')
+    .map((s) => s.trim().replace(/^["']|["']$/g, '').trim().replace(/\/+$/, ''))
     .filter(Boolean);
+  if (origins.includes('*')) throw new Error('CORS_ORIGINS must list explicit origins, not *');
+  return [...new Set(origins)];
+}
+
+export function corsOrigins(): string[] {
+  return parseCorsOrigins(env().CORS_ORIGINS);
+}
+
+/** Shared by main.ts and the CORS tests so they cannot drift apart. */
+export function corsOptions() {
+  return { origin: corsOrigins(), credentials: true };
 }
 
 // The two secrets doing double duty would make a refresh token a valid access

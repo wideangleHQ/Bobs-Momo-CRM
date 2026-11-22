@@ -57,19 +57,23 @@ export default function MyTasksPage() {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {can('task.template.manage') && (
-            <Link href="/tasks/templates">
-              <Button type="button" variant="secondary" className="min-h-[40px] text-xs sm:text-sm gap-1.5">
-                <Icon name="layers" className="h-3.5 w-3.5" />
-                <span>Templates</span>
+            <Link href="/tasks/templates" className="inline-flex shrink-0">
+              <Button type="button" variant="secondary" className="min-h-[40px] text-xs sm:text-sm gap-2 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <Icon name="layers" className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-nowrap">Templates</span>
+                </span>
               </Button>
             </Link>
           )}
 
           {can('task.task.create') && (
-            <Link href="/tasks/board">
-              <Button type="button" className="min-h-[40px] text-xs sm:text-sm gap-1.5 bg-red-600 hover:bg-red-700 text-white">
-                <Icon name="tasks" className="h-3.5 w-3.5" />
-                <span>Task Board</span>
+            <Link href="/tasks/board" className="inline-flex shrink-0">
+              <Button type="button" className="min-h-[40px] text-xs sm:text-sm gap-2 bg-red-600 hover:bg-red-700 text-white whitespace-nowrap">
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                  <Icon name="tasks" className="h-4 w-4 shrink-0" />
+                  <span className="whitespace-nowrap">Task Board</span>
+                </span>
               </Button>
             </Link>
           )}
@@ -79,7 +83,7 @@ export default function MyTasksPage() {
       {/* ── TELEMETRY SUMMARY CARDS ────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Overdue */}
-        <div className={`rounded-2xl border p-4 sm:p-5 flex items-center justify-between transition-all ${
+        <div className={`rounded-xl border p-4 sm:p-5 flex items-center justify-between transition-all ${
           overdueCount > 0 ? 'bg-red-50/50 border-red-200 shadow-sm' : 'bg-white border-zinc-200/80 shadow-sm'
         }`}>
           <div className="flex items-center gap-3">
@@ -98,7 +102,7 @@ export default function MyTasksPage() {
         </div>
 
         {/* Today */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-5 flex items-center justify-between shadow-sm">
+        <div className="rounded-xl border border-zinc-200/80 bg-white p-4 sm:p-5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
               <Icon name="clock" className="h-5 w-5" />
@@ -113,7 +117,7 @@ export default function MyTasksPage() {
         </div>
 
         {/* Coming Up */}
-        <div className="rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-5 flex items-center justify-between shadow-sm">
+        <div className="rounded-xl border border-zinc-200/80 bg-white p-4 sm:p-5 flex items-center justify-between shadow-sm">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
               <Icon name="calendar" className="h-5 w-5" />
@@ -132,7 +136,7 @@ export default function MyTasksPage() {
       {tasks.isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+            <Skeleton key={i} className="h-24 w-full rounded-xl" />
           ))}
         </div>
       ) : tasks.isError ? (
@@ -142,8 +146,8 @@ export default function MyTasksPage() {
           onRetry={() => void tasks.refetch()}
         />
       ) : total === 0 ? (
-        <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-sm p-10 flex flex-col items-center text-center">
-          <div className="h-14 w-14 rounded-2xl bg-emerald-50 flex items-center justify-center mb-3 text-emerald-600">
+        <div className="rounded-xl border border-zinc-200/80 bg-white shadow-sm p-10 flex flex-col items-center text-center">
+          <div className="h-14 w-14 rounded-xl bg-emerald-50 flex items-center justify-center mb-3 text-emerald-600">
             <Icon name="check" className="h-7 w-7" />
           </div>
           <h2 className="text-lg font-bold text-zinc-900">All caught up!</h2>
@@ -171,7 +175,7 @@ export default function MyTasksPage() {
                     <Link
                       key={t.id}
                       href={isChecklist(t) ? `/tasks/${t.id}/checklist` : `/tasks/${t.id}`}
-                      className="group relative flex flex-col justify-between rounded-2xl border border-zinc-200/80 bg-white p-4 sm:p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className="group relative flex flex-col justify-between rounded-xl border border-zinc-200/80 bg-white p-4 sm:p-5 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md hover:border-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2 mb-2">

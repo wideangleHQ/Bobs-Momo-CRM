@@ -4,6 +4,9 @@ export const workforceKeys = {
   salary: (employeeId: string) => ['employees', employeeId, 'salary'] as const,
   board: () => ['attendance', 'today'] as const,
   attendance: (params: Record<string, unknown>) => ['attendance', 'history', params] as const,
+  verificationQueue: (params: Record<string, unknown>) =>
+    ['attendance', 'verification', params] as const,
+  summary: (params: Record<string, unknown>) => ['attendance', 'summary', params] as const,
   shifts: (params: Record<string, unknown>) => ['shifts', params] as const,
   leave: (params: Record<string, unknown>) => ['leave', params] as const,
 };

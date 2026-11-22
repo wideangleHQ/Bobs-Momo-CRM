@@ -165,7 +165,7 @@ export function SearchPalette({ open, onClose }: { open: boolean; onClose: () =>
 
       {/* Palette card */}
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-zinc-200/90 bg-white shadow-2xl transition-all select-none"
+        className="relative w-full max-w-lg overflow-hidden rounded-xl border border-zinc-200/90 bg-white shadow-2xl transition-all select-none"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Search input row */}

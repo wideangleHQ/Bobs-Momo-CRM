@@ -8,12 +8,12 @@ export type BadgeVariant = BadgeTone | 'secondary';
 type BadgeVariantInput = BadgeVariant | (string & {});
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-zinc-100 text-zinc-700 border border-zinc-200',
-  success: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold',
-  warning: 'bg-amber-50 text-amber-800 border border-amber-200 font-semibold',
-  danger: 'bg-red-50 text-red-700 border border-red-200 font-semibold',
-  info: 'bg-zinc-800 text-zinc-50 font-medium',
-  primary: 'bg-red-600 text-white font-semibold',
+  neutral: 'bg-[var(--color-surface-muted)] text-[var(--color-text-muted)] border border-[var(--color-border)]',
+  success: 'bg-[var(--color-success-bg)] text-[var(--color-success)] border border-[var(--color-success-bg)] font-semibold',
+  warning: 'bg-[var(--color-warning-bg)] text-[var(--color-warning)] border border-[var(--color-warning-bg)] font-semibold',
+  danger: 'bg-[var(--color-danger-bg)] text-[var(--color-danger)] border border-[var(--color-danger-bg)] font-semibold',
+  info: 'bg-[var(--color-dark)] text-[var(--color-dark-fg)] font-medium',
+  primary: 'bg-[var(--color-primary)] text-[var(--color-primary-fg)] font-semibold',
 };
 
 /** Colour is never the only signal, so the label always carries the meaning. */

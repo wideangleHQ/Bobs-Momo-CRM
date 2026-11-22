@@ -32,21 +32,17 @@ function isBlank(data: DashboardResponse): boolean {
   );
 }
 
-// ─── KPI TILE ────────────────────────────────────────────────────────────────
+// ─── EYEBROW LABEL ───────────────────────────────────────────────────────────
 
-interface TileProps {
-  title: string;
-  value: string;
-  meta?: string;
-  changePct?: number | null;
-  icon: string;
-  iconBg: string;
-  iconColor: string;
-  alert?: boolean;
-  link?: string;
-  linkLabel?: string;
+function Eyebrow({ children }: { children: string }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-widest text-[#D9362B]">{children}</p>
+  );
 }
 
+// ─── KPI CARD VARIANTS ───────────────────────────────────────────────────────
+
+/** White card — standard KPI */
 function KpiTile({
   title,
   value,
@@ -58,56 +54,56 @@ function KpiTile({
   alert = false,
   link,
   linkLabel = 'View',
-}: TileProps) {
+}: {
+  title: string;
+  value: string;
+  meta?: string;
+  changePct?: number | null;
+  icon: string;
+  iconBg: string;
+  iconColor: string;
+  alert?: boolean;
+  link?: string;
+  linkLabel?: string;
+}) {
   const isPositive = (changePct ?? 0) >= 0;
 
   const content = (
     <div
-      className={`group relative h-full rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 ease-out ${
+      className={`group relative h-full rounded-xl border p-3.5 sm:p-4 flex flex-col justify-between transition-all duration-200 ease-out ${
         alert
-          ? 'border-red-200/90 bg-red-50/40 hover:bg-red-50/70 hover:border-red-300'
-          : 'border-zinc-200/80 bg-white hover:border-zinc-300 hover:shadow-md'
+          ? 'border-[#D9362B]/20 bg-[#FFF0EE]/60 hover:bg-[#FFF0EE] hover:border-[#D9362B]/30'
+          : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-border-strong)] hover:shadow-sm'
       } ${link ? 'hover:-translate-y-0.5 cursor-pointer' : ''}`}
     >
       <div>
-        {/* Header row */}
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div
-            className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${iconBg}`}
-          >
-            <Icon name={icon} className={`h-5 w-5 ${iconColor}`} />
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+            <Icon name={icon} className={`h-4 w-4 ${iconColor}`} />
           </div>
           {link ? (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-400 group-hover:text-red-600 transition-colors">
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[var(--color-text-muted)] group-hover:text-[#D9362B] transition-colors">
               {linkLabel}
-              <Icon name="arrowUpRight" className="h-3 w-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              <Icon name="arrowUpRight" className="h-3 w-3" />
             </span>
           ) : null}
         </div>
-
-        {/* Title & Value */}
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">{title}</p>
-        <p className={`text-2xl sm:text-3xl font-bold tracking-tight ${alert && value !== '0' ? 'text-red-700' : 'text-zinc-900'}`}>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)] mb-1">{title}</p>
+        <p className={`text-2xl font-extrabold tracking-tight leading-none ${alert && value !== '0' ? 'text-[#D9362B]' : 'text-[var(--color-text)]'}`}>
           {value}
         </p>
       </div>
-
-      {/* Footer info */}
-      <div className="flex items-center gap-2 text-xs pt-3 mt-1 border-t border-zinc-100/80">
+      <div className="flex items-center gap-1.5 text-[10px] pt-2.5 mt-2 border-t border-[var(--color-border)]">
         {changePct !== null && changePct !== undefined ? (
           <>
-            <span
-              className={`flex items-center gap-0.5 font-semibold ${
-                isPositive ? 'text-emerald-600' : 'text-red-500'
-              }`}
-            >
-              <Icon name={isPositive ? 'arrowUp' : 'arrowDown'} className="h-3 w-3" />
+            <span className={`flex items-center gap-0.5 font-bold ${isPositive ? 'text-[var(--color-success)]' : 'text-[#D9362B]'}`}>
+              <Icon name={isPositive ? 'arrowUp' : 'arrowDown'} className="h-2.5 w-2.5" />
               {Math.abs(changePct).toFixed(1)}%
             </span>
-            {meta ? <span className="text-zinc-400 font-medium">{meta}</span> : null}
+            {meta ? <span className="text-[var(--color-text-muted)] font-medium truncate">{meta}</span> : null}
           </>
         ) : meta ? (
-          <span className="text-zinc-400 font-medium">{meta}</span>
+          <span className="text-[var(--color-text-muted)] font-medium truncate">{meta}</span>
         ) : null}
       </div>
     </div>
@@ -115,173 +111,219 @@ function KpiTile({
 
   if (link) {
     return (
-      <Link href={link} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded-2xl">
+      <Link href={link} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9362B] rounded-xl">
         {content}
       </Link>
     );
   }
-
   return content;
 }
 
-// ─── ACTION CARD ─────────────────────────────────────────────────────────────
-
-interface ActionCardProps {
+/** Red hero card — primary metric */
+function HeroKpiCard({
+  title,
+  value,
+  meta,
+  changePct,
+  icon,
+  link,
+}: {
   title: string;
-  description: string;
-  href: string;
+  value: string;
+  meta?: string;
+  changePct?: number | null;
   icon: string;
-  badge?: string;
-  primary?: boolean;
-  accentColor?: 'red' | 'emerald' | 'blue' | 'amber' | 'zinc';
+  link?: string;
+}) {
+  const isPositive = (changePct ?? 0) >= 0;
+  const content = (
+    <div className="group relative h-full rounded-xl p-4 sm:p-5 flex flex-col justify-between bg-[#D9362B] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer">
+      <div className="absolute -right-6 -top-6 h-28 w-28 rounded-full bg-white/5 pointer-events-none" />
+      <div className="absolute -right-2 -bottom-4 h-18 w-18 rounded-full bg-white/5 pointer-events-none" />
+
+      <div>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="h-9 w-9 rounded-lg bg-white/15 flex items-center justify-center flex-shrink-0">
+            <Icon name={icon} className="h-4.5 w-4.5 text-white" />
+          </div>
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-white/60 group-hover:text-white transition-colors">
+            View report
+            <Icon name="arrowUpRight" className="h-3 w-3" />
+          </span>
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{title}</p>
+        <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-none">{value}</p>
+      </div>
+
+      <div className="flex items-center gap-2 text-[10px] pt-3 mt-2 border-t border-white/15">
+        {changePct !== null && changePct !== undefined ? (
+          <>
+            <span className={`flex items-center gap-0.5 font-bold px-1.5 py-0.5 rounded ${isPositive ? 'bg-white/15 text-white' : 'bg-white/10 text-white/70'}`}>
+              <Icon name={isPositive ? 'arrowUp' : 'arrowDown'} className="h-2.5 w-2.5" />
+              {Math.abs(changePct).toFixed(1)}%
+            </span>
+            {meta ? <span className="text-white/55 font-medium">{meta}</span> : null}
+          </>
+        ) : meta ? (
+          <span className="text-white/55 font-medium">{meta}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (link) {
+    return (
+      <Link href={link} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-xl">
+        {content}
+      </Link>
+    );
+  }
+  return content;
 }
 
-function ActionCard({
+/** Dark/black card — secondary hero metric */
+function DarkKpiCard({
+  title,
+  value,
+  meta,
+  changePct,
+  icon,
+  link,
+}: {
+  title: string;
+  value: string;
+  meta?: string;
+  changePct?: number | null;
+  icon: string;
+  link?: string;
+}) {
+  const isPositive = (changePct ?? 0) >= 0;
+  const content = (
+    <div className="group relative h-full rounded-xl p-4 sm:p-5 flex flex-col justify-between bg-[#171717] overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md cursor-pointer">
+      <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/[0.03] pointer-events-none" />
+
+      <div>
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+            <Icon name={icon} className="h-4.5 w-4.5 text-white" />
+          </div>
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-white/40 group-hover:text-[#FFC928] transition-colors">
+            Details
+            <Icon name="arrowUpRight" className="h-3 w-3" />
+          </span>
+        </div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1.5">{title}</p>
+        <p className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-none">{value}</p>
+      </div>
+
+      <div className="flex items-center gap-2 text-[10px] pt-3 mt-2 border-t border-white/10">
+        {changePct !== null && changePct !== undefined ? (
+          <>
+            <span className={`flex items-center gap-0.5 font-bold ${isPositive ? 'text-[#FFC928]' : 'text-[#D9362B]'}`}>
+              <Icon name={isPositive ? 'arrowUp' : 'arrowDown'} className="h-2.5 w-2.5" />
+              {Math.abs(changePct).toFixed(1)}%
+            </span>
+            {meta ? <span className="text-white/35 font-medium">{meta}</span> : null}
+          </>
+        ) : meta ? (
+          <span className="text-white/35 font-medium">{meta}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (link) {
+    return (
+      <Link href={link} className="block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFC928] rounded-xl">
+        {content}
+      </Link>
+    );
+  }
+  return content;
+}
+
+// ─── COMPACT QUICK ACTION ROW ────────────────────────────────────────────────
+
+function QuickActionRow({
   title,
   description,
   href,
   icon,
-  badge,
-  primary = false,
-  accentColor = 'zinc',
-}: ActionCardProps) {
-  const colorMap = {
-    red: {
-      bg: 'bg-red-50',
-      text: 'text-red-600',
-      border: 'hover:border-red-300',
-      badge: 'bg-red-100 text-red-700',
-    },
-    emerald: {
-      bg: 'bg-emerald-50',
-      text: 'text-emerald-600',
-      border: 'hover:border-emerald-300',
-      badge: 'bg-emerald-100 text-emerald-700',
-    },
-    blue: {
-      bg: 'bg-blue-50',
-      text: 'text-blue-600',
-      border: 'hover:border-blue-300',
-      badge: 'bg-blue-100 text-blue-700',
-    },
-    amber: {
-      bg: 'bg-amber-50',
-      text: 'text-amber-600',
-      border: 'hover:border-amber-300',
-      badge: 'bg-amber-100 text-amber-700',
-    },
-    zinc: {
-      bg: 'bg-zinc-100',
-      text: 'text-zinc-700',
-      border: 'hover:border-zinc-300',
-      badge: 'bg-zinc-200 text-zinc-700',
-    },
-  };
-
-  const scheme = colorMap[accentColor];
-
+}: {
+  title: string;
+  description?: string;
+  href: string;
+  icon: string;
+}) {
   return (
     <Link
       href={href}
-      className={`group relative flex flex-col justify-between rounded-2xl border p-4 sm:p-5 transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 hover:-translate-y-0.5 hover:shadow-md ${
-        primary
-          ? 'border-red-200 bg-gradient-to-br from-red-50/60 via-white to-white hover:border-red-300 shadow-sm'
-          : `border-zinc-200/80 bg-white ${scheme.border} shadow-sm`
-      }`}
+      className="group flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 hover:border-[#D9362B]/40 hover:shadow-sm transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9362B]"
     >
-      <div>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div
-            className={`h-11 w-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-105 ${
-              primary ? 'bg-red-600 text-white shadow-sm' : `${scheme.bg} ${scheme.text}`
-            }`}
-          >
-            <Icon name={icon} className="h-5 w-5" />
-          </div>
-          {badge ? (
-            <span className={`inline-flex items-center rounded-lg px-2 py-0.5 text-[11px] font-semibold ${scheme.badge}`}>
-              {badge}
-            </span>
-          ) : (
-            <Icon
-              name="arrowUpRight"
-              className="h-4 w-4 text-zinc-300 group-hover:text-zinc-600 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-            />
-          )}
-        </div>
-
-        <h3 className="text-sm sm:text-base font-bold text-zinc-900 group-hover:text-red-600 transition-colors">
-          {title}
-        </h3>
-        <p className="text-xs text-zinc-500 mt-1 line-clamp-2 leading-relaxed">{description}</p>
+      <div className="h-8 w-8 rounded-lg bg-[#FFF0EE] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-150">
+        <Icon name={icon} className="h-4 w-4 text-[#D9362B]" />
       </div>
-
-      <div className="mt-4 pt-2 flex items-center gap-1.5 text-xs font-semibold text-zinc-400 group-hover:text-zinc-700 transition-colors">
-        <span>Open action</span>
-        <Icon name="arrowRight" className="h-3 w-3 transition-transform group-hover:translate-x-1" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-[var(--color-text)] group-hover:text-[#D9362B] transition-colors leading-tight">{title}</p>
+        {description ? <p className="text-[11px] text-[var(--color-text-muted)] truncate mt-0.5">{description}</p> : null}
       </div>
+      <Icon name="chevronRight" className="h-4 w-4 text-[var(--color-text-muted)] group-hover:text-[#D9362B] flex-shrink-0 transition-colors" />
     </Link>
-  );
-}
-
-// ─── SKELETON GRID ───────────────────────────────────────────────────────────
-
-function DashboardSkeletons() {
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <Skeleton key={i} className="h-[140px] rounded-2xl" />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Skeleton key={i} className="h-[148px] rounded-2xl" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <Skeleton className="lg:col-span-2 h-80 rounded-2xl" />
-        <Skeleton className="h-80 rounded-2xl" />
-      </div>
-    </div>
   );
 }
 
 // ─── OUTLET BAR ──────────────────────────────────────────────────────────────
 
-function OutletBar({
-  name,
-  sales,
-  pct,
-  color,
-}: {
-  name: string;
-  sales: string;
-  pct: number;
-  color: string;
-}) {
+function OutletBar({ name, sales, pct, color }: { name: string; sales: string; pct: number; color: string }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center text-sm flex-shrink-0">
-            🏪
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-6 h-6 rounded-lg bg-[#FFF0EE] flex items-center justify-center flex-shrink-0">
+            <Icon name="building" className="h-3 w-3 text-[#D9362B]" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-zinc-800 truncate">{name}</p>
-            <p className="text-[11px] text-zinc-400">Store location</p>
-          </div>
+          <p className="text-xs font-semibold text-[var(--color-text)] truncate">{name}</p>
         </div>
-        <p className="text-sm font-bold text-zinc-900 tabular-nums flex-shrink-0">{sales}</p>
+        <p className="text-xs font-bold text-[var(--color-text)] tabular-nums flex-shrink-0">{sales}</p>
       </div>
-      <div className="flex items-center gap-2.5">
-        <div className="h-2 flex-1 bg-zinc-100 rounded-full overflow-hidden">
+      <div className="flex items-center gap-2">
+        <div className="h-1.5 flex-1 bg-[var(--color-surface-muted)] rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ease-out ${color}`}
             style={{ width: `${Math.min(100, Math.max(3, pct))}%` }}
           />
         </div>
-        <span className="text-[11px] font-semibold text-zinc-400 w-9 text-right tabular-nums">{pct.toFixed(0)}%</span>
+        <span className="text-[10px] font-semibold text-[var(--color-text-muted)] w-8 text-right tabular-nums">{pct.toFixed(0)}%</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── SKELETON ────────────────────────────────────────────────────────────────
+
+function DashboardSkeletons() {
+  return (
+    <div className="space-y-4">
+      {/* KPI row */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+        <Skeleton className="col-span-2 lg:col-span-3 h-[130px] rounded-xl" />
+        <Skeleton className="col-span-1 lg:col-span-2 h-[130px] rounded-xl" />
+        <Skeleton className="col-span-1 lg:col-span-1 h-[130px] rounded-xl" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Skeleton className="h-[110px] rounded-xl" />
+        <Skeleton className="h-[110px] rounded-xl" />
+      </div>
+      {/* Quick actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+      </div>
+      {/* Sales */}
+      <Skeleton className="h-[280px] rounded-xl" />
+      {/* Low stock + wastage */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <Skeleton className="lg:col-span-3 h-[240px] rounded-xl" />
+        <Skeleton className="lg:col-span-2 h-[240px] rounded-xl" />
       </div>
     </div>
   );
@@ -302,55 +344,42 @@ export default function DashboardPage() {
 
   const data = query.data;
 
-  // Greeting based on time of day
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <div className="w-full space-y-6 sm:space-y-8">
-      {/* ── PAGE HEADER ─────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-zinc-100">
+    <div className="w-full space-y-4 sm:space-y-6">
+      {/* ── PAGE HEADER ─────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-[var(--color-border)]">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
-              Operations Control
-            </span>
-            <p className="text-xs font-medium text-zinc-400">· {greeting}</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-[#D9362B]">Operations</span>
+            <span className="text-[10px] font-medium text-[var(--color-text-muted)]">· {greeting}</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 tracking-tight mt-1">
-            {user?.fullName ? `${user.fullName.split(' ')[0]}'s Workspace` : 'Operations Dashboard'}
+          <h1 className="text-xl sm:text-2xl font-extrabold text-[var(--color-text)] tracking-tight leading-tight">
+            {user?.fullName ? `${user.fullName.split(' ')[0]}'s Dashboard` : "Bob's Momo Dashboard"}
           </h1>
           {data?.businessDate ? (
-            <p className="text-xs sm:text-sm text-zinc-500 mt-1 flex items-center gap-1.5">
-              <Icon name="calendar" className="h-3.5 w-3.5 text-zinc-400" />
-              <span>
-                Business Date:{' '}
-                <strong className="text-zinc-700 font-semibold">
-                  {new Date(data.businessDate).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
-                </strong>
-              </span>
+            <p className="text-[11px] text-[var(--color-text-muted)] mt-1 flex items-center gap-1">
+              <Icon name="calendar" className="h-3 w-3" />
+              Business date:{' '}
+              <strong className="font-semibold text-[var(--color-text)]">
+                {new Date(data.businessDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </strong>
             </p>
           ) : null}
         </div>
 
-        {/* Status Indicators & Fast Actions */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {data?.todaysSalesEntry ? (
             <div
-              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-semibold border shadow-sm ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-semibold border ${
                 data.todaysSalesEntry.entered
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
+                  ? 'bg-[var(--color-success-bg)] border-[var(--color-success-bg)] text-[var(--color-success)]'
+                  : 'bg-[var(--color-warning-bg)] border-[var(--color-warning-bg)] text-[var(--color-warning)]'
               }`}
             >
-              <Icon
-                name={data.todaysSalesEntry.entered ? 'check' : 'warning'}
-                className="h-4 w-4 flex-shrink-0"
-              />
+              <Icon name={data.todaysSalesEntry.entered ? 'check' : 'warning'} className="h-3.5 w-3.5 flex-shrink-0" />
               <span>{data.todaysSalesEntry.entered ? "Today's sales recorded" : 'Daily sales pending'}</span>
             </div>
           ) : null}
@@ -358,542 +387,403 @@ export default function DashboardPage() {
           {can('purchase.record.create') || can('inventory.transaction.create') ? (
             <Link
               href="/inventory/receive"
-              className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2 text-xs sm:text-sm font-semibold text-white shadow-sm hover:bg-red-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#D9362B] px-3.5 py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-sm hover:bg-[#A8201A] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D9362B]"
             >
-              <Icon name="plus" className="h-4 w-4" />
+              <Icon name="plus" className="h-3.5 w-3.5" />
               <span>Record New Stock</span>
             </Link>
           ) : null}
         </div>
       </div>
 
-      {/* ── LOADING ─────────────────────────────────────────── */}
+      {/* ── LOADING / ERROR ──────────────────────────────────────────────── */}
       {query.isPending ? (
         <DashboardSkeletons />
       ) : query.isError ? (
         <ErrorState message={errorMessage(query.error)} onRetry={() => void query.refetch()} />
       ) : !data ? null : (
         <>
-          {/* ── WARNING ALERTS ──────────────────────────────── */}
+          {/* Partial-data warning */}
           {data.errors && data.errors.length > 0 ? (
-            <div className="flex items-start gap-3 rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3.5 text-sm text-amber-900 shadow-sm">
-              <Icon name="warning" className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-600" />
+            <div className="flex items-start gap-3 rounded-xl bg-[var(--color-warning-bg)] border border-[var(--color-warning-bg)] px-4 py-3 text-sm text-[var(--color-warning)]">
+              <Icon name="warning" className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-amber-950">Some metrics could not be fully calculated</p>
-                <p className="text-xs text-amber-800 mt-0.5">{data.errors.join(', ')}. Remaining figures are accurate.</p>
+                <p className="font-semibold">Some metrics could not be fully calculated</p>
+                <p className="text-[11px] mt-0.5 opacity-80">{data.errors.join(', ')}. Remaining figures are accurate.</p>
               </div>
             </div>
           ) : null}
 
-          {/* ── BLANK STATE ─────────────────────────────────── */}
+          {/* Blank-state CTA */}
           {isBlank(data) ? (
-            <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-sm p-10 flex flex-col items-center text-center">
-              <div className="h-14 w-14 rounded-2xl bg-zinc-100 flex items-center justify-center mb-4">
-                <Icon name="chart" className="h-7 w-7 text-zinc-400" />
+            <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-8 flex flex-col items-center text-center">
+              <div className="h-12 w-12 rounded-xl bg-[var(--color-surface-muted)] flex items-center justify-center mb-3">
+                <Icon name="chart" className="h-6 w-6 text-[var(--color-text-muted)]" />
               </div>
-              <h2 className="text-lg font-bold text-zinc-900 mb-1">No activity recorded for this period</h2>
-              <p className="text-sm text-zinc-500 max-w-md leading-relaxed">
-                There are no sales, stock movements, or tasks recorded yet. Start by recording a new delivery or entering sales.
-              </p>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <h2 className="text-base font-bold text-[var(--color-text)] mb-1">No activity recorded yet</h2>
+              <p className="text-xs text-[var(--color-text-muted)] max-w-sm">Start by recording a new delivery or entering today's sales.</p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 {can('purchase.record.create') || can('inventory.transaction.create') ? (
-                  <Link
-                    href="/inventory/receive"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-red-700 transition-colors"
-                  >
-                    <Icon name="package" className="h-4 w-4" />
+                  <Link href="/inventory/receive" className="inline-flex items-center gap-2 px-4 py-2 bg-[#D9362B] text-white rounded-lg text-xs font-semibold hover:bg-[#A8201A] transition-colors">
+                    <Icon name="package" className="h-3.5 w-3.5" />
                     Record New Stock
                   </Link>
                 ) : null}
                 {can('sales.entry.create') ? (
-                  <Link
-                    href="/sales/entry"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-zinc-900 text-white rounded-xl text-sm font-semibold shadow-sm hover:bg-zinc-800 transition-colors"
-                  >
+                  <Link href="/sales/entry" className="inline-flex items-center gap-2 px-4 py-2 bg-[#171717] text-white rounded-lg text-xs font-semibold hover:bg-[#292929] transition-colors">
                     Enter today&apos;s sales
-                    <Icon name="arrowRight" className="h-4 w-4" />
+                    <Icon name="arrowRight" className="h-3.5 w-3.5" />
                   </Link>
                 ) : null}
               </div>
             </div>
           ) : null}
 
-          {/* ── 1. CORE OPERATIONAL QUICK ACTIONS ───────────────── */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500">Quick Actions & Workflows</h2>
-                <p className="text-xs text-zinc-400">Direct access to daily operational tasks</p>
-              </div>
+          {/* ── 1. KEY BUSINESS METRICS ─────────────────────────────────── */}
+          <section className="space-y-2.5">
+            <div>
+              <Eyebrow>Key Business Metrics</Eyebrow>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Live operational &amp; sales telemetry</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-              {/* Primary Action: Record New Stock */}
-              {(can('purchase.record.create') || can('inventory.transaction.create')) && (
-                <ActionCard
-                  title="Record New Stock"
-                  description="Receive stock from supplier with invoice & items in one flow."
-                  href="/inventory/receive"
-                  icon="package"
-                  badge="Primary"
-                  primary={true}
-                  accentColor="red"
-                />
-              )}
-
-              {/* Check Stock */}
-              {can('inventory.stock.read') && (
-                <ActionCard
-                  title="Check Stock"
-                  description="View current inventory quantities & low-stock items."
-                  href="/inventory/stock"
-                  icon="warehouse"
-                  accentColor="amber"
-                />
-              )}
-
-              {/* Stock History */}
-              {can('inventory.stock.read') && (
-                <ActionCard
-                  title="Stock History"
-                  description="Track audit log of stock received, usage & wastage."
-                  href="/inventory/history"
-                  icon="history"
-                  accentColor="blue"
-                />
-              )}
-
-              {/* Purchases */}
-              {can('purchase.record.read') && (
-                <ActionCard
-                  title="Purchases"
-                  description="View and verify supplier purchase invoices & slips."
-                  href="/purchases/records"
-                  icon="receipt"
-                  accentColor="emerald"
-                />
-              )}
-
-              {/* Suppliers */}
-              {can('vendor.vendor.read') && (
-                <ActionCard
-                  title="Suppliers"
-                  description="Manage vendor details, phone numbers, and GSTIN."
-                  href="/vendors"
-                  icon="building"
-                  accentColor="zinc"
-                />
-              )}
-
-              {/* Manage Items */}
-              {can('inventory.item.read') && (
-                <ActionCard
-                  title="Manage Items"
-                  description="View master catalog, units, categories & reorder levels."
-                  href="/inventory/items"
-                  icon="layers"
-                  accentColor="zinc"
-                />
-              )}
-            </div>
-          </section>
-
-          {/* ── 2. KPI OVERVIEW CARDS ──────────────────────────── */}
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-500">Key Business Metrics</h2>
-                <p className="text-xs text-zinc-400">Live operational & sales telemetry</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-              {/* Net Sales Today */}
+            {/* Asymmetric row: hero(3) + dark(2) + alert(1) on 6-col */}
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2.5 sm:gap-3">
               {data.netSalesToday !== undefined ? (
-                <KpiTile
-                  title="Net Sales Today"
-                  value={money(data.netSalesToday.total)}
-                  changePct={data.netSalesToday.changePctVsSameDayLastWeek ?? null}
-                  meta="vs same day last week"
-                  icon="currencyRupee"
-                  iconBg="bg-red-600"
-                  iconColor="text-white"
-                  link={can('analytics.sales.read') ? '/reports/sales' : undefined}
-                />
+                <div className="col-span-2 lg:col-span-3">
+                  <HeroKpiCard
+                    title="Net Sales Today"
+                    value={money(data.netSalesToday.total)}
+                    changePct={data.netSalesToday.changePctVsSameDayLastWeek ?? null}
+                    meta="vs same day last week"
+                    icon="currencyRupee"
+                    link={can('analytics.sales.read') ? '/reports/sales' : undefined}
+                  />
+                </div>
               ) : null}
 
-              {/* Net Sales MTD */}
               {data.netSalesMtd !== undefined ? (
-                <KpiTile
-                  title="Net Sales MTD"
-                  value={money(data.netSalesMtd.total)}
-                  changePct={data.netSalesMtd.changePctVsLastMonth ?? null}
-                  meta={
-                    data.netSalesMtd.daysEntered !== undefined && data.netSalesMtd.daysExpected !== undefined
-                      ? `${data.netSalesMtd.daysEntered}/${data.netSalesMtd.daysExpected} days entered`
-                      : 'vs last month'
-                  }
-                  icon="trendUp"
-                  iconBg="bg-red-50"
-                  iconColor="text-red-600"
-                  link={can('analytics.sales.read') ? '/reports/sales' : undefined}
-                />
+                <div className="col-span-2 lg:col-span-2">
+                  <DarkKpiCard
+                    title="Net Sales MTD"
+                    value={money(data.netSalesMtd.total)}
+                    changePct={data.netSalesMtd.changePctVsLastMonth ?? null}
+                    meta={
+                      data.netSalesMtd.daysEntered !== undefined && data.netSalesMtd.daysExpected !== undefined
+                        ? `${data.netSalesMtd.daysEntered}/${data.netSalesMtd.daysExpected} days`
+                        : 'vs last month'
+                    }
+                    icon="trendUp"
+                    link={can('analytics.sales.read') ? '/reports/sales' : undefined}
+                  />
+                </div>
               ) : null}
 
-              {/* Gross Margin */}
-              {data.grossMargin !== undefined ? (
-                <KpiTile
-                  title="Gross Margin"
-                  value={
-                    data.grossMargin.grossMarginPct !== null && data.grossMargin.grossMarginPct !== undefined
-                      ? `${num(data.grossMargin.grossMarginPct).toFixed(1)}%`
-                      : money(data.grossMargin.grossMarginApprox)
-                  }
-                  meta={data.grossMargin.caveat ?? 'approx, excl. overhead'}
-                  icon="chart"
-                  iconBg="bg-amber-50"
-                  iconColor="text-amber-600"
-                  link={can('analytics.pnl.read') ? '/reports/pnl' : undefined}
-                />
-              ) : null}
-
-              {/* Low Stock Items */}
               {data.lowStock !== undefined ? (
-                <KpiTile
-                  title="Low Stock Items"
-                  value={String(data.lowStock.count)}
-                  meta="items below reorder level"
-                  icon="box"
-                  iconBg={data.lowStock.count > 0 ? 'bg-amber-100' : 'bg-emerald-50'}
-                  iconColor={data.lowStock.count > 0 ? 'text-amber-600' : 'text-emerald-600'}
-                  alert={data.lowStock.count > 0}
-                  link={can('inventory.stock.read') ? '/inventory/stock' : undefined}
-                  linkLabel="Restock"
-                />
+                <div className="col-span-1 lg:col-span-1">
+                  <KpiTile
+                    title="Low Stock"
+                    value={String(data.lowStock.count)}
+                    meta="below reorder"
+                    icon="box"
+                    iconBg={data.lowStock.count > 0 ? 'bg-[#FFF0EE]' : 'bg-[var(--color-success-bg)]'}
+                    iconColor={data.lowStock.count > 0 ? 'text-[#D9362B]' : 'text-[var(--color-success)]'}
+                    alert={data.lowStock.count > 0}
+                    link={can('inventory.stock.read') ? '/inventory/stock' : undefined}
+                    linkLabel="Restock"
+                  />
+                </div>
               ) : null}
+            </div>
 
-              {/* Wastage Value */}
-              {data.wastage !== undefined ? (
-                <KpiTile
-                  title="Wastage Value"
-                  value={money(data.wastage.value)}
-                  meta="total recorded wastage"
-                  icon="package"
-                  iconBg="bg-zinc-100"
-                  iconColor="text-zinc-600"
-                  link={can('analytics.wastage.read') ? '/reports/wastage' : undefined}
-                />
-              ) : null}
+            {/* Secondary row: Pending Approvals + Overdue Tasks */}
+            {(data.pendingApprovals !== undefined || data.overdueTasks !== undefined) ? (
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                {data.pendingApprovals !== undefined ? (
+                  <KpiTile
+                    title="Pending Approvals"
+                    value={String((data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0))}
+                    meta={
+                      [
+                        data.pendingApprovals.purchaseRequests ? `${data.pendingApprovals.purchaseRequests} purchase` : '',
+                        data.pendingApprovals.leaveRequests ? `${data.pendingApprovals.leaveRequests} leave` : '',
+                      ].filter(Boolean).join(', ') || 'requests pending'
+                    }
+                    icon="inbox"
+                    iconBg={(data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0 ? 'bg-[#FFF0EE]' : 'bg-[var(--color-success-bg)]'}
+                    iconColor={(data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0 ? 'text-[#D9362B]' : 'text-[var(--color-success)]'}
+                    alert={(data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0}
+                    link={can('purchase.request.read') ? '/purchases/requests' : undefined}
+                    linkLabel="Review"
+                  />
+                ) : null}
 
-              {/* Missing Sales Entries */}
-              {data.missingSalesEntries !== undefined ? (
-                <KpiTile
-                  title="Missing Entries"
-                  value={String(data.missingSalesEntries.count)}
-                  meta="outlets pending entry"
-                  icon="warning"
-                  iconBg={data.missingSalesEntries.count > 0 ? 'bg-red-100' : 'bg-emerald-50'}
-                  iconColor={data.missingSalesEntries.count > 0 ? 'text-red-600' : 'text-emerald-600'}
-                  alert={data.missingSalesEntries.count > 0}
-                  link={can('sales.entry.create') ? '/sales/entry' : undefined}
-                  linkLabel="Fix"
-                />
-              ) : null}
+                {data.overdueTasks !== undefined ? (
+                  <KpiTile
+                    title="Overdue Tasks"
+                    value={String(data.overdueTasks.count)}
+                    meta={data.openTasks?.count ? `${data.openTasks.count} open total` : 'checklist items'}
+                    icon="tasks"
+                    iconBg={data.overdueTasks.count > 0 ? 'bg-[#FFF0EE]' : 'bg-[var(--color-success-bg)]'}
+                    iconColor={data.overdueTasks.count > 0 ? 'text-[#D9362B]' : 'text-[var(--color-success)]'}
+                    alert={data.overdueTasks.count > 0}
+                    link={can('task.task.read') ? '/tasks' : undefined}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </section>
 
-              {/* Overdue Tasks */}
-              {data.overdueTasks !== undefined ? (
-                <KpiTile
-                  title="Overdue Tasks"
-                  value={String(data.overdueTasks.count)}
-                  meta={data.openTasks?.count ? `${data.openTasks.count} total open tasks` : 'checklist items'}
-                  icon="tasks"
-                  iconBg={data.overdueTasks.count > 0 ? 'bg-red-100' : 'bg-emerald-50'}
-                  iconColor={data.overdueTasks.count > 0 ? 'text-red-600' : 'text-emerald-600'}
-                  alert={data.overdueTasks.count > 0}
-                  link={can('task.task.read') ? '/tasks' : undefined}
-                  linkLabel="View"
-                />
-              ) : null}
+          {/* ── 2. QUICK ACTIONS ────────────────────────────────────────── */}
+          <section className="space-y-2.5">
+            <div>
+              <Eyebrow>Quick Actions</Eyebrow>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Direct access to daily operational tasks</p>
+            </div>
 
-              {/* Pending Approvals */}
-              {data.pendingApprovals !== undefined ? (
-                <KpiTile
-                  title="Pending Approvals"
-                  value={String(
-                    (data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0),
-                  )}
-                  meta={[
-                    data.pendingApprovals.purchaseRequests ? `${data.pendingApprovals.purchaseRequests} purchase` : '',
-                    data.pendingApprovals.leaveRequests ? `${data.pendingApprovals.leaveRequests} leave` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(', ') || 'requests pending'}
-                  icon="inbox"
-                  iconBg={
-                    (data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0
-                      ? 'bg-red-100'
-                      : 'bg-emerald-50'
-                  }
-                  iconColor={
-                    (data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0
-                      ? 'text-red-600'
-                      : 'text-emerald-600'
-                  }
-                  alert={
-                    (data.pendingApprovals.purchaseRequests ?? 0) + (data.pendingApprovals.leaveRequests ?? 0) > 0
-                  }
-                  link={can('purchase.request.read') ? '/purchases/requests' : undefined}
-                  linkLabel="Review"
-                />
-              ) : null}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {(can('purchase.record.create') || can('inventory.transaction.create')) && (
+                <QuickActionRow title="Record New Stock" description="Receive stock from supplier" href="/inventory/receive" icon="package" />
+              )}
+              {can('inventory.stock.read') && (
+                <QuickActionRow title="Check Stock" description="Current on-hand quantities" href="/inventory/stock" icon="warehouse" />
+              )}
+              {can('inventory.stock.read') && (
+                <QuickActionRow title="Stock History" description="Audit log of movements" href="/inventory/history" icon="history" />
+              )}
+              {can('purchase.record.read') && (
+                <QuickActionRow title="Purchases" description="Supplier invoices &amp; records" href="/purchases/records" icon="receipt" />
+              )}
+              {can('vendor.vendor.read') && (
+                <QuickActionRow title="Suppliers" description="Vendor details &amp; contacts" href="/vendors" icon="building" />
+              )}
+              {can('inventory.item.read') && (
+                <QuickActionRow title="Manage Items" description="Catalog, units &amp; categories" href="/inventory/items" icon="layers" />
+              )}
             </div>
           </section>
 
-          {/* ── 3. ANALYTICS & OUTLET DISTRIBUTION ────────────── */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Sales Chart */}
-            <div className="lg:col-span-2 bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-2 pb-3 border-b border-zinc-100">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
-                      <Icon name="chart" className="h-5 w-5 text-red-600" />
+          {/* ── 3. SALES OVERVIEW ───────────────────────────────────────── */}
+          <section className="space-y-2.5">
+            <div>
+              <Eyebrow>Sales Overview</Eyebrow>
+              <p className="text-[11px] text-[var(--color-text-muted)] mt-0.5">Daily net sales trend for active period</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+              {/* Sales Chart — wide */}
+              <div className="lg:col-span-2 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-sm p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-2 pb-3 border-b border-[var(--color-border)]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-[#FFF0EE] flex items-center justify-center flex-shrink-0">
+                      <Icon name="chart" className="h-4 w-4 text-[#D9362B]" />
                     </div>
-                    <div>
-                      <h2 className="text-base font-bold text-zinc-900">Sales Overview</h2>
-                      <p className="text-xs text-zinc-400">Daily net sales trend for active period</p>
-                    </div>
+                    <h2 className="text-sm font-bold text-[var(--color-text)]">Net Sales Trend</h2>
                   </div>
-                  <div className="flex items-center gap-3 text-xs font-semibold text-zinc-500">
-                    <span className="flex items-center gap-1.5 bg-zinc-50 px-2.5 py-1 rounded-lg border border-zinc-100">
-                      <span className="w-2 h-2 rounded-full bg-red-600 inline-block" />
+                  <div className="flex items-center gap-3 text-[11px] font-semibold text-[var(--color-text-muted)]">
+                    <span className="flex items-center gap-1.5 bg-[var(--color-surface-muted)] px-2 py-1 rounded-lg border border-[var(--color-border)]">
+                      <span className="w-2 h-2 rounded-full bg-[#D9362B] inline-block" />
                       Net Sales (₹)
                     </span>
                     {can('analytics.sales.read') ? (
-                      <Link
-                        href="/reports/sales"
-                        className="text-red-600 hover:text-red-700 flex items-center gap-0.5 transition-colors"
-                      >
-                        Detailed report <Icon name="chevronRight" className="h-3.5 w-3.5" />
+                      <Link href="/reports/sales" className="text-[#D9362B] hover:text-[#A8201A] flex items-center gap-0.5 transition-colors">
+                        Detailed report <Icon name="chevronRight" className="h-3 w-3" />
                       </Link>
                     ) : null}
                   </div>
                 </div>
 
-                <div className="w-full min-h-[240px]">
+                <div className="w-full">
                   {data.salesSeries && data.salesSeries.length > 0 ? (
                     <LineChart
                       title="Net sales by business date"
                       rows={data.salesSeries.map((p) => ({
-                        label: p.businessDate.slice(5), // MM-DD
+                        label: p.businessDate.slice(5),
                         values: { net: num(p.netSales) },
                       }))}
                       series={[{ key: 'net', label: 'Net sales' }]}
                       formatValue={(v) => money(v.toFixed(0))}
-                      height={240}
+                      height={200}
                     />
                   ) : (
-                    <div className="h-[240px] flex flex-col items-center justify-center gap-2 text-zinc-300">
-                      <Icon name="chart" className="h-8 w-8" />
-                      <p className="text-sm font-medium text-zinc-400">No sales trend recorded for this period</p>
+                    <div className="h-[200px] flex flex-col items-center justify-center gap-2 text-[var(--color-text-muted)]">
+                      <Icon name="chart" className="h-7 w-7" />
+                      <p className="text-xs font-medium">No sales trend recorded for this period</p>
                     </div>
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* Sales by Outlet */}
-            <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 sm:p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-5 pb-3 border-b border-zinc-100">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-                      <Icon name="building" className="h-5 w-5 text-amber-600" />
+              {/* By Store — compact */}
+              <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-sm p-4 sm:p-5">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-[var(--color-border)]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-lg bg-[#FFF6D6] flex items-center justify-center flex-shrink-0">
+                      <Icon name="building" className="h-4 w-4 text-[#171717]" />
                     </div>
-                    <div>
-                      <h2 className="text-base font-bold text-zinc-900">By Store Outlet</h2>
-                      <p className="text-xs text-zinc-400">Today&apos;s revenue contribution</p>
-                    </div>
+                    <h2 className="text-sm font-bold text-[var(--color-text)]">By Store</h2>
                   </div>
                 </div>
 
                 {data.netSalesToday?.byOutlet && data.netSalesToday.byOutlet.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {(() => {
                       const outlets = data.netSalesToday!.byOutlet!;
                       const totalSales = outlets.reduce((sum, o) => sum + num(o.netSales), 0);
-                      const barColors = ['bg-red-600', 'bg-amber-500', 'bg-blue-600', 'bg-emerald-600'];
-                      return outlets.map((outlet, idx) => {
-                        const pct = totalSales > 0 ? (num(outlet.netSales) / totalSales) * 100 : 0;
-                        return (
-                          <OutletBar
-                            key={outlet.outletId}
-                            name={outlet.outletCode}
-                            sales={money(outlet.netSales)}
-                            pct={pct}
-                            color={barColors[idx % barColors.length] ?? 'bg-red-600'}
-                          />
-                        );
-                      });
+                      const barColors = ['bg-[#D9362B]', 'bg-[#171717]', 'bg-[#FFC928]', 'bg-[#A8201A]'];
+                      return outlets.map((outlet, idx) => (
+                        <OutletBar
+                          key={outlet.outletId}
+                          name={outlet.outletCode}
+                          sales={money(outlet.netSales)}
+                          pct={totalSales > 0 ? (num(outlet.netSales) / totalSales) * 100 : 0}
+                          color={barColors[idx % barColors.length] ?? 'bg-[#D9362B]'}
+                        />
+                      ));
                     })()}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center h-48 text-zinc-300 gap-2">
-                    <Icon name="building" className="h-8 w-8" />
-                    <p className="text-xs text-zinc-400 font-medium">No store sales recorded today</p>
+                  <div className="flex flex-col items-center justify-center h-40 text-[var(--color-text-muted)] gap-2">
+                    <Icon name="building" className="h-7 w-7" />
+                    <p className="text-[11px] font-medium">No store sales recorded today</p>
                   </div>
                 )}
               </div>
             </div>
           </section>
 
-          {/* ── 4. OPERATIONAL DETAIL SECTIONS ─────────────────── */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            {/* Low stock items detail */}
-            {data.lowStock && data.lowStock.count > 0 && data.lowStock.items && data.lowStock.items.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-amber-200/90 shadow-sm overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-amber-100 bg-amber-50/40">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-                        <Icon name="warning" className="h-4 w-4 text-amber-700" />
-                      </div>
-                      <div>
-                        <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
-                          Low Stock Alerts
-                          <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
-                            {data.lowStock.count} items
-                          </span>
-                        </h2>
-                        <p className="text-[11px] text-zinc-500">Inventory levels requiring restock</p>
-                      </div>
-                    </div>
-                    {can('inventory.stock.read') ? (
-                      <Link
-                        href="/inventory/stock"
-                        className="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-0.5 transition-colors"
-                      >
-                        View all <Icon name="chevronRight" className="h-3 w-3" />
-                      </Link>
-                    ) : null}
-                  </div>
+          {/* ── 4. LOW STOCK + WASTAGE ──────────────────────────────────── */}
+          <section className="space-y-2.5">
+            <div>
+              <Eyebrow>Stock &amp; Wastage</Eyebrow>
+            </div>
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-[11px] font-semibold text-zinc-400 uppercase tracking-wider border-b border-zinc-100 bg-zinc-50/50">
-                          <th className="px-5 py-2.5">Item</th>
-                          <th className="px-5 py-2.5 text-right">On Hand</th>
-                          <th className="px-5 py-2.5 text-right">Reorder Level</th>
-                          <th className="px-5 py-2.5 text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-100">
-                        {data.lowStock.items.slice(0, 5).map((item) => (
-                          <tr key={item.itemId} className="hover:bg-amber-50/30 transition-colors">
-                            <td className="px-5 py-3">
-                              <p className="font-semibold text-zinc-800">{item.itemName}</p>
-                              {item.outletCode ? <p className="text-[11px] text-zinc-400">{item.outletCode}</p> : null}
-                            </td>
-                            <td className="px-5 py-3 text-right tabular-nums font-bold text-red-600">
-                              {num(item.qtyOnHand).toFixed(2)} {item.unitCode}
-                            </td>
-                            <td className="px-5 py-3 text-right tabular-nums text-zinc-500 text-xs">
-                              {num(item.reorderLevel).toFixed(2)} {item.unitCode}
-                            </td>
-                            <td className="px-5 py-3 text-right">
-                              {(can('purchase.record.create') || can('inventory.transaction.create')) ? (
-                                <Link
-                                  href={`/inventory/receive?itemId=${encodeURIComponent(item.itemId)}`}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 text-xs font-semibold transition-colors"
-                                >
-                                  <Icon name="plus" className="h-3 w-3" />
-                                  <span>Receive</span>
-                                </Link>
-                              ) : null}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-6 flex flex-col items-center justify-center text-center">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-50 flex items-center justify-center mb-3">
-                  <Icon name="check" className="h-6 w-6 text-emerald-600" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900">Inventory Levels Healthy</h3>
-                <p className="text-xs text-zinc-500 mt-1 max-w-xs">
-                  No items are currently below their configured reorder thresholds.
-                </p>
-                {can('inventory.stock.read') ? (
-                  <Link
-                    href="/inventory/stock"
-                    className="mt-4 text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-1"
-                  >
-                    Check Stock List <Icon name="chevronRight" className="h-3 w-3" />
-                  </Link>
-                ) : null}
-              </div>
-            )}
-
-            {/* Top Wastage Items */}
-            {data.wastage && num(data.wastage.value) > 0 && data.wastage.topItems && data.wastage.topItems.length > 0 ? (
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 bg-zinc-50/50">
-                    <div className="flex items-center gap-2.5">
-                      <div className="h-8 w-8 rounded-lg bg-zinc-100 flex items-center justify-center flex-shrink-0">
-                        <Icon name="package" className="h-4 w-4 text-zinc-600" />
-                      </div>
-                      <div>
-                        <h2 className="text-sm font-bold text-zinc-900">
-                          Top Wastage Items
-                        </h2>
-                        <p className="text-[11px] text-zinc-500">Total Period Loss: {money(data.wastage.value)}</p>
-                      </div>
-                    </div>
-                    {can('analytics.wastage.read') ? (
-                      <Link
-                        href="/reports/wastage"
-                        className="text-xs font-semibold text-red-600 hover:text-red-700 flex items-center gap-0.5 transition-colors"
-                      >
-                        Full report <Icon name="chevronRight" className="h-3 w-3" />
-                      </Link>
-                    ) : null}
-                  </div>
-
-                  <ul className="divide-y divide-zinc-100">
-                    {data.wastage.topItems.slice(0, 5).map((item) => (
-                      <li key={item.itemId} className="flex items-center justify-between px-5 py-3 hover:bg-zinc-50 transition-colors">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
+              {/* Low Stock Alerts — 60% (3/5) */}
+              <div className="lg:col-span-3">
+                {data.lowStock && data.lowStock.count > 0 && data.lowStock.items && data.lowStock.items.length > 0 ? (
+                  <div className="bg-[var(--color-surface)] rounded-xl border border-[#D9362B]/20 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-[#D9362B]/10 bg-[#FFF0EE]/30">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-[#FFF0EE] flex items-center justify-center flex-shrink-0">
+                          <Icon name="warning" className="h-3.5 w-3.5 text-[#D9362B]" />
+                        </div>
                         <div>
-                          <p className="text-sm font-semibold text-zinc-800">{item.itemName}</p>
-                          <p className="text-[11px] text-zinc-400">
-                            {num(item.quantity).toFixed(2)} {item.unitCode} wasted
-                          </p>
+                          <h2 className="text-xs font-bold text-[var(--color-text)]">
+                            Low Stock Alerts
+                            <span className="ml-2 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold bg-[#FFF0EE] text-[#D9362B]">
+                              {data.lowStock.count}
+                            </span>
+                          </h2>
+                          <p className="text-[10px] text-[var(--color-text-muted)]">Items requiring restock</p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-zinc-900 tabular-nums">{money(item.approxValue)}</p>
-                          <p className="text-[11px] text-zinc-400">approx cost</p>
+                      </div>
+                      {can('inventory.stock.read') ? (
+                        <Link href="/inventory/stock" className="text-[11px] font-semibold text-[#D9362B] hover:text-[#A8201A] flex items-center gap-0.5 transition-colors">
+                          View all <Icon name="chevronRight" className="h-3 w-3" />
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-[10px] font-semibold text-[var(--color-text-muted)] uppercase tracking-wider border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+                            <th className="px-4 py-2">Item</th>
+                            <th className="px-4 py-2 text-right">On Hand</th>
+                            <th className="px-4 py-2 text-right">Reorder</th>
+                            {(can('purchase.record.create') || can('inventory.transaction.create')) ? <th className="px-4 py-2 text-right" /> : null}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--color-border)]">
+                          {data.lowStock.items.slice(0, 4).map((item) => (
+                            <tr key={item.itemId} className="hover:bg-[#FFF0EE]/20 transition-colors">
+                              <td className="px-4 py-2.5">
+                                <p className="text-xs font-semibold text-[var(--color-text)]">{item.itemName}</p>
+                                {item.outletCode ? <p className="text-[10px] text-[var(--color-text-muted)]">{item.outletCode}</p> : null}
+                              </td>
+                              <td className="px-4 py-2.5 text-right tabular-nums text-xs font-bold text-[#D9362B]">
+                                {num(item.qtyOnHand).toFixed(2)} {item.unitCode}
+                              </td>
+                              <td className="px-4 py-2.5 text-right tabular-nums text-[10px] text-[var(--color-text-muted)]">
+                                {num(item.reorderLevel).toFixed(2)} {item.unitCode}
+                              </td>
+                              {(can('purchase.record.create') || can('inventory.transaction.create')) ? (
+                                <td className="px-4 py-2.5 text-right">
+                                  <Link
+                                    href={`/inventory/receive?itemId=${encodeURIComponent(item.itemId)}`}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#FFF0EE] text-[#D9362B] hover:bg-[#D9362B] hover:text-white text-[10px] font-semibold transition-colors"
+                                  >
+                                    <Icon name="plus" className="h-2.5 w-2.5" />
+                                    Receive
+                                  </Link>
+                                </td>
+                              ) : null}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-sm p-6 flex flex-col items-center justify-center text-center h-full min-h-[160px]">
+                    <div className="h-10 w-10 rounded-xl bg-[var(--color-success-bg)] flex items-center justify-center mb-2">
+                      <Icon name="check" className="h-5 w-5 text-[var(--color-success)]" />
+                    </div>
+                    <h3 className="text-xs font-bold text-[var(--color-text)]">Inventory Levels Healthy</h3>
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-1 max-w-xs">No items below reorder thresholds.</p>
+                    {can('inventory.stock.read') ? (
+                      <Link href="/inventory/stock" className="mt-3 text-[11px] font-semibold text-[#D9362B] hover:text-[#A8201A] flex items-center gap-1">
+                        Check Stock <Icon name="chevronRight" className="h-3 w-3" />
+                      </Link>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+
+              {/* Wastage Summary — 40% (2/5) */}
+              <div className="lg:col-span-2">
+                {data.wastage && num(data.wastage.value) > 0 && data.wastage.topItems && data.wastage.topItems.length > 0 ? (
+                  <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-sm overflow-hidden h-full">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)] bg-[var(--color-surface-muted)]">
+                      <div className="flex items-center gap-2">
+                        <div className="h-7 w-7 rounded-lg bg-[var(--color-surface)] flex items-center justify-center flex-shrink-0 border border-[var(--color-border)]">
+                          <Icon name="package" className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />
                         </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                        <div>
+                          <h2 className="text-xs font-bold text-[var(--color-text)]">Wastage</h2>
+                          <p className="text-[10px] text-[var(--color-text-muted)]">Loss: {money(data.wastage.value)}</p>
+                        </div>
+                      </div>
+                      {can('analytics.wastage.read') ? (
+                        <Link href="/reports/wastage" className="text-[11px] font-semibold text-[#D9362B] hover:text-[#A8201A] flex items-center gap-0.5 transition-colors">
+                          Report <Icon name="chevronRight" className="h-3 w-3" />
+                        </Link>
+                      ) : null}
+                    </div>
+
+                    <ul className="divide-y divide-[var(--color-border)]">
+                      {data.wastage.topItems.slice(0, 4).map((item) => (
+                        <li key={item.itemId} className="flex items-center justify-between px-4 py-2.5 hover:bg-[var(--color-surface-muted)] transition-colors">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-[var(--color-text)] truncate">{item.itemName}</p>
+                            <p className="text-[10px] text-[var(--color-text-muted)]">{num(item.quantity).toFixed(2)} {item.unitCode}</p>
+                          </div>
+                          <p className="text-xs font-bold text-[var(--color-text)] tabular-nums ml-3">{money(item.approxValue)}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] shadow-sm p-6 flex flex-col items-center justify-center text-center h-full min-h-[160px]">
+                    <div className="h-10 w-10 rounded-xl bg-[var(--color-surface-muted)] flex items-center justify-center mb-2">
+                      <Icon name="package" className="h-5 w-5 text-[var(--color-text-muted)]" />
+                    </div>
+                    <h3 className="text-xs font-bold text-[var(--color-text)]">No Wastage Recorded</h3>
+                    <p className="text-[11px] text-[var(--color-text-muted)] mt-1">Zero wastage for this period.</p>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-6 flex flex-col items-center justify-center text-center">
-                <div className="h-12 w-12 rounded-2xl bg-zinc-100 flex items-center justify-center mb-3">
-                  <Icon name="package" className="h-6 w-6 text-zinc-400" />
-                </div>
-                <h3 className="text-sm font-bold text-zinc-900">No Wastage Recorded</h3>
-                <p className="text-xs text-zinc-500 mt-1 max-w-xs">
-                  Zero wastage or spoilage items reported for this operating period.
-                </p>
-              </div>
-            )}
+            </div>
           </section>
         </>
       )}

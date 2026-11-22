@@ -14,13 +14,18 @@ import {
 import {
   bulkShiftSchema,
   createEmployeeSchema,
+  setEligibilitySchema,
   createLeaveSchema,
   createSalarySchema,
   createShiftSchema,
   decideLeaveSchema,
   editPunchSchema,
   exitEmployeeSchema,
+  attendanceSummaryQuery,
   listAttendanceQuery,
+  rejectAttendanceSchema,
+  verificationQueueQuery,
+  verifyAttendanceSchema,
   listEmployeesQuery,
   listLeaveQuery,
   listShiftsQuery,
@@ -29,13 +34,18 @@ import {
   updateEmployeeSchema,
   type BulkShiftDto,
   type CreateEmployeeDto,
+  type SetEligibilityDto,
   type CreateLeaveDto,
   type CreateSalaryDto,
   type CreateShiftDto,
   type DecideLeaveDto,
   type EditPunchDto,
   type ExitEmployeeDto,
+  type AttendanceSummaryQuery,
   type ListAttendanceQuery,
+  type RejectAttendanceDto,
+  type VerificationQueueQuery,
+  type VerifyAttendanceDto,
   type ListEmployeesQuery,
   type ListLeaveQuery,
   type ListShiftsQuery,
@@ -85,11 +95,27 @@ export class WorkforceController {
   @Post('employees')
   @Permissions('workforce.employee.create')
   @HttpCode(HttpStatus.CREATED)
-  createEmployee(
+  async createEmployee(
     @Body(new ZodValidationPipe(createEmployeeSchema)) dto: CreateEmployeeDto,
+    @CurrentUser() user: AuthedUser,
     @Scope() scope: RequestScope,
+    @Req() req: AuthedRequest,
   ) {
-    return this.employees.create(dto, scope);
+    // Required, like a punch: a double tap or a retry after a lost response must
+    // replay the original result, not mint a second employee and login.
+    const key = IdempotencyService.require(
+      typeof req.headers['idempotency-key'] === 'string'
+        ? req.headers['idempotency-key']
+        : undefined,
+    );
+    const { hit, commit } = await this.idempotency.replay<
+      Awaited<ReturnType<EmployeesService['create']>>
+    >(key, user.sub, 'employee.create', dto);
+    if (hit) return hit;
+
+    const result = await this.employees.create(dto, user, scope);
+    await commit(result);
+    return result;
   }
 
   @Patch('employees/:id')
@@ -97,9 +123,22 @@ export class WorkforceController {
   updateEmployee(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateEmployeeSchema)) dto: import('@bobs-momo/shared').UpdateEmployeeDto,
+    @CurrentUser() user: AuthedUser,
     @Scope() scope: RequestScope,
   ) {
-    return this.employees.update(id, dto, scope);
+    return this.employees.update(id, dto, user, scope);
+  }
+
+  @Post('employees/:id/eligibility')
+  @Permissions('workforce.employee.account')
+  @HttpCode(HttpStatus.OK)
+  setEligibility(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(setEligibilitySchema)) dto: SetEligibilityDto,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.employees.setEligibility(id, dto, user, scope);
   }
 
   @Post('employees/:id/exit')
@@ -108,9 +147,10 @@ export class WorkforceController {
   exitEmployee(
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(exitEmployeeSchema)) dto: ExitEmployeeDto,
+    @CurrentUser() user: AuthedUser,
     @Scope() scope: RequestScope,
   ) {
-    return this.employees.exit(id, dto, scope);
+    return this.employees.exit(id, dto, user, scope);
   }
 
   // ---- attendance --------------------------------------------------------
@@ -173,6 +213,49 @@ export class WorkforceController {
     @Scope() scope: RequestScope,
   ) {
     return this.attendance.list(query, scope);
+  }
+
+  @Get('attendance/summary')
+  @Permissions('workforce.attendance.read')
+  attendanceSummary(
+    @Query(new ZodValidationPipe(attendanceSummaryQuery)) query: AttendanceSummaryQuery,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.summary(query, scope);
+  }
+
+  @Get('attendance/verification-queue')
+  @Permissions('workforce.attendance.verify')
+  verificationQueue(
+    @Query(new ZodValidationPipe(verificationQueueQuery)) query: VerificationQueueQuery,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.verificationQueue(query, user, scope);
+  }
+
+  @Post('attendance/days/:id/verify')
+  @Permissions('workforce.attendance.verify')
+  @HttpCode(HttpStatus.OK)
+  verifyAttendance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(verifyAttendanceSchema)) dto: VerifyAttendanceDto,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.decide(id, 'VERIFIED', dto.note, user, scope);
+  }
+
+  @Post('attendance/days/:id/reject')
+  @Permissions('workforce.attendance.verify')
+  @HttpCode(HttpStatus.OK)
+  rejectAttendance(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(rejectAttendanceSchema)) dto: RejectAttendanceDto,
+    @CurrentUser() user: AuthedUser,
+    @Scope() scope: RequestScope,
+  ) {
+    return this.attendance.decide(id, 'REJECTED', dto.reason, user, scope);
   }
 
   @Patch('attendance/punches/:id')

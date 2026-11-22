@@ -1,5 +1,6 @@
 'use client';
 
+import { displayUsername } from '@bobs-momo/shared';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
@@ -104,6 +105,7 @@ export default function EmployeesPage() {
                     <p className="font-medium">{e.fullName}</p>
                     <p className="text-sm text-text-muted">
                       {e.employeeCode}
+                      {e.user ? ` · ${displayUsername(e.user.username)}` : ' · no login'}
                       {e.designation ? ` · ${e.designation}` : ''}
                     </p>
                     <p className="text-sm text-text-muted">
@@ -111,7 +113,12 @@ export default function EmployeesPage() {
                       {e.departmentName ? ` · ${e.departmentName}` : ''}
                     </p>
                   </div>
-                  <Badge variant={e.status === 'EXITED' ? 'neutral' : 'success'}>{e.status}</Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant={e.status === 'EXITED' ? 'neutral' : 'success'}>{e.status}</Badge>
+                    {e.eligibleForWorkflows ? null : (
+                      <Badge variant="warning">Not in attendance or tasks</Badge>
+                    )}
+                  </div>
                 </Card>
               </Link>
             </li>

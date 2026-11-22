@@ -33,7 +33,7 @@ export function UserMenu() {
 
       <Sheet open={open} onOpenChange={setOpen} title="Account">
         <div className="space-y-4 p-2">
-          <div className="rounded-2xl border border-zinc-100 bg-zinc-50 p-4">
+          <div className="rounded-xl border border-zinc-100 bg-zinc-50 p-4">
             <div className="flex items-center gap-3 mb-3">
               <div className="h-10 w-10 rounded-full bg-red-600 text-white flex items-center justify-center text-sm font-bold flex-shrink-0">
                 {initials(user.fullName)}

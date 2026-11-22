@@ -7,7 +7,7 @@ import { Card, CardBody } from '@/components/ui/card';
 export default function SignupPage() {
   return (
     <div className="flex flex-col gap-4 w-full">
-      <Card className="w-full border-none shadow-2xl rounded-[15px] overflow-hidden bg-white/95 backdrop-blur-sm">
+      <Card className="w-full border-none shadow-2xl rounded-xl overflow-hidden bg-white/95 backdrop-blur-sm">
         {/* Top Navigation */}
         <div className="px-6 py-4 border-b border-zinc-100 flex items-center">
           <Link

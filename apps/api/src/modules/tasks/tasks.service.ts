@@ -3,6 +3,8 @@ import { Prisma, type TaskStatus } from '@prisma/client';
 import { CronExpressionParser } from 'cron-parser';
 import {
   AUDIT_FOLLOW_UP_HOURS,
+  ELIGIBLE_EMPLOYMENT_STATUSES,
+  isEligibleEmployee,
   ERROR_CODES,
   TASK_ATTACHMENT_MAX_BYTES,
   TASK_ERRORS,
@@ -29,7 +31,8 @@ import type { AuthedUser, RequestScope } from '../../common/types/request';
 const IST = 'Asia/Kolkata';
 
 /** Employment states that may still be handed work. */
-const ASSIGNABLE = ['ACTIVE', 'ON_NOTICE'] as const;
+// The single rule shared with attendance and analytics. See isEligibleEmployee.
+const ASSIGNABLE = ELIGIBLE_EMPLOYMENT_STATUSES;
 
 // OVERDUE appears on the left of three rows on purpose. A task that went late
 // is still work, so the sweep flagging it does not close any door.
@@ -104,7 +107,7 @@ export class TasksService {
 
   async list(query: ListTasksQuery, scope: RequestScope) {
     const where = this.buildWhere(query, scope);
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.task.findMany({
         where,
         include: TASK_LIST_INCLUDE,
@@ -942,7 +945,12 @@ export class TasksService {
 
     const assignee = rec.assigneeId
       ? await this.prisma.employee.findFirst({
-          where: { id: rec.assigneeId, outletId, status: { in: [...ASSIGNABLE] } },
+          where: {
+            id: rec.assigneeId,
+            outletId,
+            status: { in: [...ASSIGNABLE] },
+            eligibleForWorkflows: true,
+          },
           select: { id: true, userId: true },
         })
       : null;
@@ -955,7 +963,7 @@ export class TasksService {
       assignee?.id ??
       (
         await this.prisma.employee.findFirst({
-          where: { outletId, status: { in: [...ASSIGNABLE] } },
+          where: { outletId, status: { in: [...ASSIGNABLE] }, eligibleForWorkflows: true },
           select: { id: true },
           orderBy: { createdAt: 'asc' },
         })
@@ -1059,7 +1067,13 @@ export class TasksService {
     if (!assigneeId) return null;
     const employee = await this.prisma.employee.findUnique({
       where: { id: assigneeId },
-      select: { id: true, outletId: true, status: true, userId: true },
+      select: {
+        id: true,
+        outletId: true,
+        status: true,
+        userId: true,
+        eligibleForWorkflows: true,
+      },
     });
     if (!employee) {
       throw new DomainError(
@@ -1074,10 +1088,10 @@ export class TasksService {
         'That employee works at another outlet',
       );
     }
-    if (!ASSIGNABLE.includes(employee.status as (typeof ASSIGNABLE)[number])) {
+    if (!isEligibleEmployee(employee)) {
       throw this.unprocessable(
         TASK_ERRORS.EMPLOYEE_NOT_ACTIVE,
-        'That employee has left and cannot be given work',
+        'That employee has left or is not part of task assignment and cannot be given work',
       );
     }
     return { id: employee.id, userId: employee.userId };
@@ -1088,6 +1102,7 @@ export class TasksService {
       where: {
         outletId,
         status: { in: [...ASSIGNABLE] },
+        eligibleForWorkflows: true,
         user: { roleKey: 'STORE_MANAGER', status: 'ACTIVE' },
       },
       select: { id: true },

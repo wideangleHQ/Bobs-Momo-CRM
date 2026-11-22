@@ -69,6 +69,14 @@ get a new code and a new `Employee` row, because their old attendance and leave
 history belongs to the old row and mixing the two makes every historical report
 wrong.
 
+> **Amendment 1.2 (built 27 October 2026, not deployed).** `employeeCode` is now
+> allocated from the `employee_code_seq` sequence shown above (migration
+> `20261027000000_employee_identity`, not yet applied to the live database). Before it,
+> the code was the highest existing code plus one, which two simultaneous creations
+> could collide on. The employee code is also a different identifier from the login username;
+> the proposed `BMEMP0001` username is covered in the
+> [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).
+
 ### Not every employee has a login
 
 `Employee.userId` is nullable. This is deliberate and it is the field people get
@@ -103,6 +111,13 @@ The reverse case also exists and is a trap. A `User` with no `Employee` row
 cannot create a task, because `Task.createdById` references `Employee`, not
 `User`. Every human who touches this system gets an `Employee` row, the owner
 included. Seed data creates one for the owner account on day one.
+
+> **Amendment 1.2 (draft, pending approval)** **revises this.** A login that is a shared or role-specific dashboard
+> account (for example a Counter Cashier counter login) is not a person and has **no**
+> `Employee` row. It then cannot punch, be assigned a task or create one, which is the
+> intended behaviour. A real person who also operates a dashboard keeps their own
+> employee account and employee row. See requirements `FR-IDN-001` to `FR-IDN-004`
+> in the SRS amendment and the [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).
 
 ### Outlet and department
 
@@ -658,6 +673,13 @@ and a random temporary password returned once in the response body, creates the
 
 Errors: 400 `VALIDATION_FAILED`, 409 `DUPLICATE_USERNAME`,
 422 `DEPARTMENT_OUTLET_MISMATCH`.
+
+> **Superseded by Amendment 1.2 (built 27 October 2026, not deployed).** `POST /employees`
+> is now Owner only and creates the employee and their own login in one all-or-nothing
+> transaction with a server-generated username (`FR-IDN-011`, `FR-IDN-013`). The
+> `createLogin` object above is replaced by a required `roleKey`; `userId` and
+> `username` are refused. Before this change the endpoint created only the employee row
+> and accepted an optional existing `userId`.
 
 ### GET /employees/:id
 

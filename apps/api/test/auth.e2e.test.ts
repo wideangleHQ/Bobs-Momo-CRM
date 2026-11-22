@@ -78,7 +78,7 @@ describe('login', () => {
     const user = res.body?.['user'] as Record<string, unknown>;
     expect(user['roleKey']).toBe('OWNER');
     expect(user['scope']).toBe('ALL_OUTLETS');
-    expect(Object.keys(user['permissions'] as object).length).toBe(84);
+    expect(Object.keys(user['permissions'] as object).length).toBe(85);
   });
 
   test('a wrong password and an unknown user are indistinguishable', async () => {

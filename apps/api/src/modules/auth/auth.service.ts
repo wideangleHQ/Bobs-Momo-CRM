@@ -10,6 +10,7 @@ import {
 } from '@bobs-momo/shared';
 import { DomainError } from '../../common/errors/domain.error';
 import { PERMISSION_HASHES } from '../../common/permissions';
+import { env } from '../../config/env';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { OutletCacheService } from '../../common/outlets/outlet-cache.service';
@@ -21,6 +22,13 @@ import { TokenService, sha256 } from './token.service';
 const MAX_FAILED_LOGINS = 5;
 const LOCKOUT_MINUTES = 15;
 const ROTATION_REPLAY_SECONDS = 5;
+
+// Per-IP guard on failed sign-ins. Account lockout (below) stops one account
+// being ground down; it does nothing against one guess at every account, which
+// is exactly the shape of an attack on sequential BMEMP usernames that all start
+// with the same initial password. Failures only, so a restaurant's shared wifi
+// is not locked out by ordinary use.
+const IP_FAILURE_WINDOW_SECONDS = 15 * 60;
 
 // Roles whose outlet scope is computed at login instead of read from UserOutlet,
 // so opening outlet three does not need a data fix for these accounts.
@@ -39,7 +47,12 @@ export interface TokenPair {
 }
 
 type UserWithScope = User & {
-  employee: { id: string; fullName: string } | null;
+  employee: {
+    id: string;
+    fullName: string;
+    status: string;
+    eligibleForWorkflows: boolean;
+  } | null;
   outlets: { outletId: string }[];
 };
 
@@ -57,12 +70,14 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto, ctx: RequestCtx) {
+    await this.assertIpNotLimited(ctx.ip);
     const user = (await this.repo.findUserByIdentifier(dto.identifier)) as UserWithScope | null;
 
     // Unknown user still costs a full argon2 verify, so response timing does
     // not enumerate accounts.
     if (!user) {
       await this.passwords.burnTime(dto.password);
+      await this.noteIpFailure(ctx.ip);
       throw this.invalidCredentials();
     }
 
@@ -72,6 +87,7 @@ export class AuthService {
 
     if (!ok) {
       await this.registerFailure(user);
+      await this.noteIpFailure(ctx.ip);
       throw this.invalidCredentials();
     }
 
@@ -96,7 +112,7 @@ export class AuthService {
     // Prepare JWT and refresh token outside the transaction — JWT signing and
     // outlet-cache resolution are CPU/network work that must not hold a DB
     // connection open (Prisma's default 5s interactive-transaction timeout).
-    const prepared = await this.prepareTokenPair(user, familyId);
+    const prepared = await this.prepareTokenPair(user);
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -119,7 +135,7 @@ export class AuthService {
 
   async refresh(presented: string, ctx: RequestCtx): Promise<TokenPair> {
     const tokenHash = sha256(presented);
-    const row = await this.repo.findRefreshToken(tokenHash);
+    const row = await this.repo.findRefreshTokenWithUser(tokenHash);
 
     if (!row) throw this.tokenError(ERROR_CODES.AUTH_TOKEN_INVALID, 'Sign in again');
     if (row.expiresAt < new Date()) {
@@ -149,8 +165,8 @@ export class AuthService {
       throw this.tokenError(ERROR_CODES.AUTH_TOKEN_REUSED, 'Sign in again');
     }
 
-    const user = (await this.repo.findUserById(row.userId)) as UserWithScope | null;
-    if (!user || user.status !== 'ACTIVE') {
+    const user = row.user as UserWithScope;
+    if (user.status !== 'ACTIVE') {
       throw new DomainError(
         HttpStatus.FORBIDDEN,
         ERROR_CODES.AUTH_ACCOUNT_DISABLED,
@@ -158,7 +174,7 @@ export class AuthService {
       );
     }
 
-    const prepared = await this.prepareTokenPair(user, row.familyId);
+    const prepared = await this.prepareTokenPair(user);
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -225,7 +241,7 @@ export class AuthService {
     const familyId = randomUUID();
     // A fresh session so the user is not bounced to login the moment they set a
     // password. Prepare outside the transaction for the same reason as login().
-    const prepared = await this.prepareTokenPair({ ...user, mustReset: false }, familyId);
+    const prepared = await this.prepareTokenPair({ ...user, mustReset: false });
 
     await this.prisma.$transaction(
       async (tx) => {
@@ -322,7 +338,6 @@ export class AuthService {
 
   private async prepareTokenPair(
     user: UserWithScope,
-    familyId: string,
   ): Promise<{ pair: TokenPair; tokenHash: string; expiresAt: Date }> {
     const { outletIds, scope } = await this.resolveScope(user);
     const accessToken = await this.tokens.signAccess({
@@ -384,6 +399,22 @@ export class AuthService {
       ip: ctx.ip,
       userAgent: ctx.userAgent,
     };
+  }
+
+  private async assertIpNotLimited(ip: string | null): Promise<void> {
+    if (!ip) return;
+    const failures = await this.redis.get<number>(`auth:ipfail:${ip}`);
+    if ((failures ?? 0) >= env().LOGIN_IP_FAILURE_LIMIT) {
+      throw new DomainError(
+        HttpStatus.TOO_MANY_REQUESTS,
+        ERROR_CODES.COMMON_RATE_LIMITED,
+        'Too many failed sign-ins from this network. Try again in a few minutes',
+      );
+    }
+  }
+
+  private async noteIpFailure(ip: string | null): Promise<void> {
+    if (ip) await this.redis.incr(`auth:ipfail:${ip}`, IP_FAILURE_WINDOW_SECONDS);
   }
 
   private invalidCredentials(): DomainError {

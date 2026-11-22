@@ -537,6 +537,35 @@ even by a client that ignores the flag. The web app is not the enforcement
 point. `MustResetGuard` is registered globally in `app.module.ts` next to
 `JwtAuthGuard` and reads `req.user.mustReset` from the verified claim.
 
+## Shared dashboard accounts and employee accounts (Amendment 1.2, draft)
+
+> **Amendment 1.2 (draft, pending approval)**. Built and tested on an isolated database on 27 October 2026, not deployed.
+> It records the separation so the authentication rules above can be read correctly. There is one sign-in, `POST /auth/login` (page `/login`), for employees and shared
+> dashboard accounts alike; the web app then sends an employee with no dashboard permission to
+> `/attendance` and everyone else to `/dashboard`. `/employee/login` redirects to `/login`. the per-address failure limit is `LOGIN_IP_FAILURE_LIMIT`. Full analysis:
+> [identity analysis](../docs/identity/employee-identity-and-dashboard-accounts.md).
+
+A `User` row is only a credential. It becomes an *employee account* when exactly one
+`Employee` row points at it and one person uses it. A *dashboard account* (for example
+the Counter Cashier counter login) is a `User` with no `Employee` row, used by whoever
+is at the counter. The two are independent: one person can hold both.
+
+What this means for the rules in this chapter:
+
+- **First login and reset are unchanged.** `mustReset` is already enforced on the
+  server (in `JwtAuthGuard`, not a separate `MustResetGuard` as written above).
+- **The initial credential.** New employee accounts start with the requested fixed
+  value `password1234` (decision A is still open and the risk is recorded). It is now
+  in the deny list in `password.service.ts`, so nobody can choose it as a real
+  password, and the forced change applies. Password resets still issue a unique
+  random passphrase.
+- **Usernames:** generated `BMEMP0001` names are stored lower case, as this chapter
+  and the schema require, and displayed upper case. See decision B.
+- **Reset authority:** `auth.password.reset_other` is held by four roles; the
+  amendment says Owner-level only (decision E).
+- **A shared account cannot identify the person at the counter.** The audit trail
+  will name the account, not the operator (decision D).
+
 ## Session storage on the client
 
 | Token | Where it lives | Lifetime |

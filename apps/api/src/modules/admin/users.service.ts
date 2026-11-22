@@ -2,6 +2,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   ADMIN_ERRORS,
+  EMPLOYEE_USERNAME_PATTERN,
+  ERROR_CODES,
   paginate,
   type AssignOutletsDto,
   type AssignRoleDto,
@@ -70,7 +72,7 @@ export class AdminUsersService {
         : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,
@@ -136,6 +138,18 @@ export class AdminUsersService {
   async update(id: string, dto: UpdateUserDto, actor: Actor, scope: RequestScope) {
     const before = await this.load(id, actor, scope);
     if (dto.status === 'SUSPENDED' && id === actor.user.sub) throw selfBlocked('suspend');
+    // A generated employee username is an identifier, not a label. Renaming it
+    // would break every audit row and printed handover that names it.
+    if (
+      dto.username !== undefined &&
+      dto.username !== before.username &&
+      EMPLOYEE_USERNAME_PATTERN.test(before.username)
+    ) {
+      throw DomainError.conflict(
+        ERROR_CODES.COMMON_CONFLICT,
+        'A generated employee username cannot be changed',
+      );
+    }
 
     await this.tx(async (tx) => {
       const after = await tx.user.update({

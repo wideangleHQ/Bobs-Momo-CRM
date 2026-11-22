@@ -58,7 +58,7 @@ export class InventoryRepository {
   }
 
   listItems(where: Prisma.InventoryItemWhereInput, skip: number, take: number) {
-    return this.prisma.$transaction([
+    return Promise.all([
       this.prisma.inventoryItem.findMany({
         where,
         skip,
@@ -79,7 +79,7 @@ export class InventoryRepository {
   }
 
   listStock(where: Prisma.ItemStockWhereInput, skip: number, take: number) {
-    return this.prisma.$transaction([
+    return Promise.all([
       this.prisma.itemStock.findMany({
         where,
         skip,
@@ -134,7 +134,7 @@ export class InventoryRepository {
   }
 
   listTransactions(where: Prisma.StockTransactionWhereInput, skip: number, take: number) {
-    return this.prisma.$transaction([
+    return Promise.all([
       this.prisma.stockTransaction.findMany({
         where,
         skip,

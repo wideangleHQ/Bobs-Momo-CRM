@@ -2,6 +2,7 @@ export * from './admin';
 export * from './analytics';
 export * from './business-date';
 export * from './crm';
+export * from './employee-identity';
 export * from './enums';
 export * from './errors';
 export * from './inventory';

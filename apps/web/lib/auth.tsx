@@ -32,6 +32,17 @@ export interface SessionUser {
   permissions: Record<string, 'A' | 'O' | 'S'>;
 }
 
+/**
+ * Where a signed-in person starts. An employee whose role has no dashboard (a
+ * cook, for example) starts on their own attendance page instead of a screen that
+ * would tell them "Not allowed". A shared dashboard account has no employee record,
+ * so it is unaffected and lands where it always did.
+ */
+export function homePath(user: SessionUser): string {
+  const hasDashboard = Object.hasOwn(user.permissions, 'analytics.dashboard.read');
+  return user.employeeId && !hasDashboard ? '/attendance' : '/dashboard';
+}
+
 interface SessionValue {
   user: SessionUser | null;
   loading: boolean;

@@ -211,3 +211,18 @@ into [chapter 04](04-decisions-register.md) the same day.
 Anything that changes after it has been answered goes through the scope-change protocol in
 [chapter 03](03-phase-1-scope.md). That is not bureaucracy on a three week project, it is
 the only thing that keeps the last week from disappearing.
+
+## Group 4, employee identity (Amendment 1.2, draft)
+
+> **Amendment 1.2 (draft, pending approval)**. Unlike Groups 1 to 3, these have **no default**. Development of the
+> affected parts waits for an answer. The documentation can proceed without them.
+
+| ID | Decision | Position today | Needs |
+|---|---|---|---|
+| A | Initial password for new employees | `password1234` requested; the system generates a random passphrase today; `password1234` is not on the deny list | Owner approval; unique per employee is recommended |
+| B | Username convention | `BMEMP0001` proposed; existing rule is lower case and separate from `BM-EMP-0007` | Confirm format, case and numbering relation |
+| C | Existing accounts | 13 role-named logins each have their own employee row, including both counter cashiers | Owner classification before any change |
+| D | Shared dashboard accountability | No cashier shift or operator workflow exists | Decide whether one is needed |
+| E | Owner management scope | HR can create employees; four roles can reset passwords; username is editable; three different employee-status eligibility rules | Confirm rights, editable fields and one status rule |
+| F | Role of an employee account | Every role includes self-service; no self-service-only role | Define, possibly a new role |
+| G | Login entry points | One `/login` page | Separate addresses or routing by account type |

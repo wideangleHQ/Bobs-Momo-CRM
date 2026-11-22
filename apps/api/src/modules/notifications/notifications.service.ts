@@ -34,7 +34,7 @@ export class NotificationsService {
       ...(query.eventKey ? { eventKey: query.eventKey } : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.notification.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

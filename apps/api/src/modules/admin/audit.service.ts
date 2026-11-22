@@ -43,7 +43,7 @@ export class AdminAuditService {
         : {}),
     };
 
-    const [rows, total] = await this.prisma.$transaction([
+    const [rows, total] = await Promise.all([
       this.prisma.auditLog.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,
@@ -83,7 +83,7 @@ export class AdminAuditService {
    */
   async deadLetters(query: { page: number; pageSize: number }) {
     const where = { status: 'DEAD' as const };
-    const [rows, total, pending] = await this.prisma.$transaction([
+    const [rows, total, pending] = await Promise.all([
       this.prisma.outboxEvent.findMany({
         where,
         skip: (query.page - 1) * query.pageSize,

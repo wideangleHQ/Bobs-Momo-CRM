@@ -429,6 +429,17 @@ difference between a simple architecture and an underbuilt one.
 
 ## Connection pooling
 
+> **As built (5 November 2026).** The deployment uses the Supabase **Session Pooler**
+> on port 5432, which allows 15 clients for the whole project, and the Transaction
+> Pooler measured about four times slower from this app. The API sizes its own pool in
+> code: `DB_POOL_SIZE` (default 5 in production and staging, 3 elsewhere) plus
+> `DB_POOL_TIMEOUT_S` (default 20), applied only when `DATABASE_URL` carries no
+> `connection_limit` of its own, and one extra connection for the job-lock client.
+> A pool timeout or a pooler refusal returns `503 COMMON_UNAVAILABLE` with
+> `Retry-After`. The budget and the reasoning are in
+> [database-connection-budget](../docs/db/database-connection-budget.md). The text
+> below describes the transaction-pooler design that was planned first.
+
 Prisma connects through Supavisor in transaction mode on port 6543. Two
 settings in `DATABASE_URL` are not optional.
 

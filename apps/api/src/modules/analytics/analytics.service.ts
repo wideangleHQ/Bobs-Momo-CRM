@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { Prisma, type TaskStatus } from '@prisma/client';
 import {
   ANALYTICS_ERRORS,
+  ELIGIBLE_EMPLOYMENT_STATUSES,
   EXPORT_ROW_CAP,
   GROSS_MARGIN_CAVEAT,
   GROSS_MARGIN_EXCLUDES,
@@ -14,6 +15,7 @@ import {
   type SalesReportQuery,
   type WasteQuery,
 } from '@bobs-momo/shared';
+import { createLimiter } from '../../common/concurrency/limiter';
 import { DomainError } from '../../common/errors/domain.error';
 import { lowStockWhere } from '../inventory/inventory.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -34,6 +36,11 @@ const CONSUMPTION_TYPES = ['ISSUED', 'WASTAGE'] as const;
 export const CONSUMPTION_TOP_N = 20;
 const DASHBOARD_TTL_SECONDS = 60;
 const DASHBOARD_SERIES_DAYS = 14;
+// Queries one dashboard build keeps in flight. The Prisma pool is 3 to 5
+// connections shared by every request, so a build that fires fifteen at once
+// only queues behind itself in the pool; this keeps it to a few at a time and
+// leaves room for other requests.
+const DASHBOARD_QUERY_CONCURRENCY = 3;
 
 // "Late" is a business judgement the client will move after a fortnight of real
 // data. It sits here until there is somewhere better than a magic number.
@@ -56,6 +63,10 @@ interface PricedWasteGroup {
 
 @Injectable()
 export class AnalyticsService {
+  // Identical dashboards requested while one is being built share that build,
+  // so a refresh storm costs one set of queries instead of one per tab.
+  private readonly dashboardBuilds = new Map<string, Promise<Record<string, unknown>>>();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -486,7 +497,11 @@ export class AnalyticsService {
 
     const [employees, tasks, attendance, outlets] = await Promise.all([
       this.prisma.employee.findMany({
-        where: { outletId: { in: scope.outletIds }, status: 'ACTIVE' },
+        where: {
+          outletId: { in: scope.outletIds },
+          status: { in: [...ELIGIBLE_EMPLOYMENT_STATUSES] },
+          eligibleForWorkflows: true,
+        },
         select: { id: true, employeeCode: true, fullName: true, outletId: true },
       }),
       this.prisma.task.findMany({
@@ -676,17 +691,24 @@ export class AnalyticsService {
     const cached = await this.redis.get<Record<string, unknown>>(cacheKey);
     if (cached) return cached;
 
-    const payload =
-      variant === 'owner'
-        ? await this.ownerDashboard(businessDate, scope)
-        : variant === 'outlet'
-          ? await this.outletDashboard(businessDate, scope)
-          : await this.functionalDashboard(businessDate, scope);
+    const building = this.dashboardBuilds.get(cacheKey);
+    if (building) return building;
 
-    // Nothing invalidates this. A tile can be 60 seconds stale, and write
-    // through invalidation for nine tiles buys less than it costs.
-    await this.redis.set(cacheKey, payload, DASHBOARD_TTL_SECONDS);
-    return payload;
+    const build = (async () => {
+      const payload: Record<string, unknown> =
+        variant === 'owner'
+          ? await this.ownerDashboard(businessDate, scope)
+          : variant === 'outlet'
+            ? await this.outletDashboard(businessDate, scope)
+            : await this.functionalDashboard(businessDate, scope);
+
+      // Nothing invalidates this. A tile can be 60 seconds stale, and write
+      // through invalidation for nine tiles buys less than it costs.
+      await this.redis.set(cacheKey, payload, DASHBOARD_TTL_SECONDS);
+      return payload;
+    })().finally(() => this.dashboardBuilds.delete(cacheKey));
+    this.dashboardBuilds.set(cacheKey, build);
+    return build;
   }
 
   private async ownerDashboard(businessDate: string, scope: RequestScope) {
@@ -694,35 +716,64 @@ export class AnalyticsService {
     const lastMonth = previousMonthRange(businessDate);
     const seriesFrom = shiftDate(businessDate, -(DASHBOARD_SERIES_DAYS - 1));
 
-    const [today, mtd, lastMonthNet, series, missing, purchases, wastage, stock, tasks, approvals, game] =
+    const lastWeek = shiftDate(businessDate, -7);
+    const weekStart = shiftDate(businessDate, -6);
+    // One read of the sales rows covers the four totals, the 14 day series and
+    // the missing-entry scan, which used to be six queries over overlapping
+    // ranges. The earliest of those ranges is last month's start.
+    const salesFrom = [lastMonth.from, lastWeek, monthStart, seriesFrom, weekStart].sort()[0]!;
+    const { start: gameStart, end: gameEnd } = gameBounds(weekStart, businessDate);
+    const limit = createLimiter(DASHBOARD_QUERY_CONCURRENCY);
+
+    const [salesRows, outlets, purchases, wastage, stock, taskRows, purchaseRequests, leaveRequests, plays, redeemed] =
       await Promise.all([
-        this.salesTotals(businessDate, businessDate, scope.outletIds),
-        this.salesTotals(monthStart, businessDate, scope.outletIds),
-        this.salesTotals(lastMonth.from, lastMonth.to, scope.outletIds),
-        this.netSalesSeries(seriesFrom, businessDate, scope.outletIds),
-        this.missingEntries(shiftDate(businessDate, -6), businessDate, scope.outletIds),
-        this.prisma.purchase.aggregate({
-          where: {
-            status: 'RECORDED',
-            purchaseDate: { gte: dayUtc(monthStart), lte: dayUtc(businessDate) },
-            outletId: { in: scope.outletIds },
-          },
-          _sum: { totalAmount: true },
-        }),
-        this.pricedWastage(monthStart, businessDate, scope.outletIds),
-        this.lowStock(scope.outletIds),
-        this.taskCounts(scope.outletIds),
-        this.pendingApprovals(scope.outletIds),
-        this.gameActivity(shiftDate(businessDate, -6), businessDate),
+        limit(() => this.salesRows(salesFrom, businessDate, scope.outletIds)),
+        limit(() =>
+          this.prisma.outlet.findMany({
+            where: { id: { in: scope.outletIds } },
+            select: { id: true, code: true, isActive: true },
+            orderBy: { code: 'asc' },
+          }),
+        ),
+        limit(() =>
+          this.prisma.purchase.aggregate({
+            where: {
+              status: 'RECORDED',
+              purchaseDate: { gte: dayUtc(monthStart), lte: dayUtc(businessDate) },
+              outletId: { in: scope.outletIds },
+            },
+            _sum: { totalAmount: true },
+          }),
+        ),
+        limit(() => this.pricedWastage(monthStart, businessDate, scope.outletIds)),
+        limit(() => this.lowStock(scope.outletIds)),
+        limit(() => this.taskGroups(scope.outletIds)),
+        limit(() => this.prisma.purchaseRequest.count({ where: { status: 'PENDING', outletId: { in: scope.outletIds } } })),
+        limit(() =>
+          this.prisma.leaveRequest.count({
+            where: { status: 'PENDING', employee: { outletId: { in: scope.outletIds } } },
+          }),
+        ),
+        limit(() => this.prisma.gamePlay.count({ where: { playedAt: { gte: gameStart, lt: gameEnd } } })),
+        limit(() =>
+          this.prisma.rewardIssue.count({
+            where: { status: 'REDEEMED', createdAt: { gte: gameStart, lt: gameEnd } },
+          }),
+        ),
       ]);
+
+    const today = totalsOf(salesRows, businessDate, businessDate);
+    const lastWeekSameDay = totalsOf(salesRows, lastWeek, lastWeek);
+    const mtd = totalsOf(salesRows, monthStart, businessDate);
+    const lastMonthNet = totalsOf(salesRows, lastMonth.from, lastMonth.to);
+    const series = seriesOf(salesRows, seriesFrom, businessDate);
+    const missing = missingOf(outlets, salesRows, weekStart, businessDate);
+    const tasks = shapeTaskCounts(taskRows, new Map(outlets.map((o) => [o.id, o.code])));
+    const approvals = { purchaseRequests, leaveRequests };
+    const game = { plays, rewardsRedeemed: redeemed, windowDays: eachDate(weekStart, businessDate).length };
 
     const purchaseCost = purchases._sum.totalAmount ?? ZERO;
     const wastageValue = wastage.reduce((acc, g) => acc.plus(g.value), ZERO);
-    const lastWeekSameDay = await this.salesTotals(
-      shiftDate(businessDate, -7),
-      shiftDate(businessDate, -7),
-      scope.outletIds,
-    );
 
     return {
       variant: 'owner' as const,
@@ -994,69 +1045,18 @@ export class AnalyticsService {
 
   // ---- shared tile queries ----------------------------------------------
 
-  private async salesTotals(from: string, to: string, outletIds: string[]) {
-    const rows = await this.prisma.dailySalesEntry.findMany({
+  private salesRows(from: string, to: string, outletIds: string[]): Promise<SalesRow[]> {
+    return this.prisma.dailySalesEntry.findMany({
       where: {
         businessDate: { gte: dayUtc(from), lte: dayUtc(to) },
         outletId: { in: outletIds },
       },
-      select: { outletId: true, netSales: true, outlet: { select: { code: true } } },
+      select: { businessDate: true, outletId: true, netSales: true, outlet: { select: { code: true } } },
     });
-
-    const byOutlet = new Map<string, { outletId: string; outletCode: string; netSales: Decimal }>();
-    let netSales = ZERO;
-    for (const row of rows) {
-      netSales = netSales.plus(row.netSales);
-      const bucket = byOutlet.get(row.outletId) ?? {
-        outletId: row.outletId,
-        outletCode: row.outlet.code,
-        netSales: ZERO,
-      };
-      bucket.netSales = bucket.netSales.plus(row.netSales);
-      byOutlet.set(row.outletId, bucket);
-    }
-
-    return {
-      netSales,
-      entryCount: rows.length,
-      byOutlet: [...byOutlet.values()]
-        .sort((a, b) => a.outletCode.localeCompare(b.outletCode))
-        .map((o) => ({ outletId: o.outletId, outletCode: o.outletCode, netSales: o.netSales.toFixed(2) })),
-    };
   }
 
-  private async netSalesSeries(from: string, to: string, outletIds: string[]) {
-    const rows = await this.prisma.dailySalesEntry.groupBy({
-      by: ['businessDate'],
-      where: { businessDate: { gte: dayUtc(from), lte: dayUtc(to) }, outletId: { in: outletIds } },
-      _sum: { netSales: true },
-    });
-    const byDate = new Map(rows.map((r) => [isoDate(r.businessDate), r._sum.netSales ?? ZERO]));
-    // Every day in the window, entered or not, so a quiet day and a missing
-    // entry do not draw the same shape.
-    return eachDate(from, to).map((businessDate) => ({
-      businessDate,
-      netSales: byDate.get(businessDate)?.toFixed(2) ?? null,
-    }));
-  }
-
-  private async missingEntries(from: string, to: string, outletIds: string[]) {
-    const [outlets, rows] = await Promise.all([
-      this.prisma.outlet.findMany({
-        where: { id: { in: outletIds }, isActive: true },
-        select: { id: true, code: true },
-      }),
-      this.prisma.dailySalesEntry.findMany({
-        where: { businessDate: { gte: dayUtc(from), lte: dayUtc(to) }, outletId: { in: outletIds } },
-        select: { outletId: true, businessDate: true },
-      }),
-    ]);
-    const entered = new Set(rows.map((r) => `${r.outletId}|${isoDate(r.businessDate)}`));
-    return outlets.flatMap((o) =>
-      eachDate(from, to)
-        .filter((date) => !entered.has(`${o.id}|${date}`))
-        .map((businessDate) => ({ outletId: o.id, outletCode: o.code, businessDate })),
-    );
+  private async salesTotals(from: string, to: string, outletIds: string[]) {
+    return totalsOf(await this.salesRows(from, to, outletIds), from, to);
   }
 
   private async lowStock(outletIds: string[]) {
@@ -1098,27 +1098,17 @@ export class AnalyticsService {
     };
   }
 
-  private async taskCounts(outletIds: string[]) {
-    const rows = await this.prisma.task.groupBy({
+  private taskGroups(outletIds: string[]) {
+    return this.prisma.task.groupBy({
       by: ['status', 'outletId'],
       where: { outletId: { in: outletIds }, status: { in: ['OPEN', 'IN_PROGRESS', 'OVERDUE'] } },
       _count: { _all: true },
     });
-    const outlets = await this.outletCodes(outletIds);
-    const total = (status: TaskStatus): number =>
-      rows.filter((r) => r.status === status).reduce((acc, r) => acc + r._count._all, 0);
+  }
 
-    const overdueByOutlet: Record<string, number> = {};
-    for (const row of rows.filter((r) => r.status === 'OVERDUE')) {
-      const code = outlets.get(row.outletId) ?? row.outletId;
-      overdueByOutlet[code] = (overdueByOutlet[code] ?? 0) + row._count._all;
-    }
-    return {
-      open: total('OPEN'),
-      inProgress: total('IN_PROGRESS'),
-      overdue: total('OVERDUE'),
-      overdueByOutlet,
-    };
+  private async taskCounts(outletIds: string[]) {
+    const [rows, outlets] = await Promise.all([this.taskGroups(outletIds), this.outletCodes(outletIds)]);
+    return shapeTaskCounts(rows, outlets);
   }
 
   private async pendingApprovals(outletIds: string[]) {
@@ -1131,22 +1121,6 @@ export class AnalyticsService {
       }),
     ]);
     return { purchaseRequests, leaveRequests };
-  }
-
-  /**
-   * The game buckets by IST calendar day rather than the 04:00 trading day.
-   * A customer playing at 01:30 is not part of any outlet's trade.
-   */
-  private async gameActivity(from: string, to: string) {
-    const start = new Date(dayUtc(from).getTime() - 5.5 * 60 * 60 * 1000);
-    const end = new Date(dayUtc(to).getTime() + DAY_MS - 5.5 * 60 * 60 * 1000);
-    const [plays, redeemed] = await Promise.all([
-      this.prisma.gamePlay.count({ where: { playedAt: { gte: start, lt: end } } }),
-      this.prisma.rewardIssue.count({
-        where: { status: 'REDEEMED', createdAt: { gte: start, lt: end } },
-      }),
-    ]);
-    return { plays, rewardsRedeemed: redeemed, windowDays: eachDate(from, to).length };
   }
 
   private async outletCodes(outletIds: string[]): Promise<Map<string, string>> {
@@ -1194,6 +1168,100 @@ function emptyBucket(businessDate: string, outletId: string | null, outletCode: 
 }
 
 type CsvCell = string | number | null;
+
+interface SalesRow {
+  businessDate: Date;
+  outletId: string;
+  netSales: Decimal;
+  outlet: { code: string };
+}
+
+type TaskGroupRow = { status: TaskStatus; outletId: string; _count: { _all: number } };
+
+/** Sum and per-outlet split of the rows whose business date falls in [from, to]. */
+function totalsOf(rows: SalesRow[], from: string, to: string) {
+  const inRange = rows.filter((r) => {
+    const d = isoDate(r.businessDate);
+    return d >= from && d <= to;
+  });
+  const byOutlet = new Map<string, { outletId: string; outletCode: string; netSales: Decimal }>();
+  let netSales = ZERO;
+  for (const row of inRange) {
+    netSales = netSales.plus(row.netSales);
+    const bucket = byOutlet.get(row.outletId) ?? {
+      outletId: row.outletId,
+      outletCode: row.outlet.code,
+      netSales: ZERO,
+    };
+    bucket.netSales = bucket.netSales.plus(row.netSales);
+    byOutlet.set(row.outletId, bucket);
+  }
+  return {
+    netSales,
+    entryCount: inRange.length,
+    byOutlet: [...byOutlet.values()]
+      .sort((a, b) => a.outletCode.localeCompare(b.outletCode))
+      .map((o) => ({ outletId: o.outletId, outletCode: o.outletCode, netSales: o.netSales.toFixed(2) })),
+  };
+}
+
+/** Net sales for every day in [from, to], entered or not, so a quiet day and a missing entry do not draw the same shape. */
+function seriesOf(rows: SalesRow[], from: string, to: string) {
+  const byDate = new Map<string, Decimal>();
+  for (const r of rows) {
+    const d = isoDate(r.businessDate);
+    if (d >= from && d <= to) byDate.set(d, (byDate.get(d) ?? ZERO).plus(r.netSales));
+  }
+  return eachDate(from, to).map((businessDate) => ({
+    businessDate,
+    netSales: byDate.get(businessDate)?.toFixed(2) ?? null,
+  }));
+}
+
+/** Active outlet and date pairs in [from, to] with no sales entry. */
+function missingOf(
+  outlets: Array<{ id: string; code: string; isActive: boolean }>,
+  rows: SalesRow[],
+  from: string,
+  to: string,
+) {
+  const entered = new Set(rows.map((r) => `${r.outletId}|${isoDate(r.businessDate)}`));
+  return outlets
+    .filter((o) => o.isActive)
+    .flatMap((o) =>
+      eachDate(from, to)
+        .filter((date) => !entered.has(`${o.id}|${date}`))
+        .map((businessDate) => ({ outletId: o.id, outletCode: o.code, businessDate })),
+    );
+}
+
+function shapeTaskCounts(rows: TaskGroupRow[], outlets: Map<string, string>) {
+  const total = (status: TaskStatus): number =>
+    rows.filter((r) => r.status === status).reduce((acc, r) => acc + r._count._all, 0);
+
+  const overdueByOutlet: Record<string, number> = {};
+  for (const row of rows.filter((r) => r.status === 'OVERDUE')) {
+    const code = outlets.get(row.outletId) ?? row.outletId;
+    overdueByOutlet[code] = (overdueByOutlet[code] ?? 0) + row._count._all;
+  }
+  return {
+    open: total('OPEN'),
+    inProgress: total('IN_PROGRESS'),
+    overdue: total('OVERDUE'),
+    overdueByOutlet,
+  };
+}
+
+/**
+ * The game buckets by IST calendar day rather than the 04:00 trading day.
+ * A customer playing at 01:30 is not part of any outlet's trade.
+ */
+function gameBounds(from: string, to: string): { start: Date; end: Date } {
+  return {
+    start: new Date(dayUtc(from).getTime() - 5.5 * 60 * 60 * 1000),
+    end: new Date(dayUtc(to).getTime() + DAY_MS - 5.5 * 60 * 60 * 1000),
+  };
+}
 
 function dayUtc(date: string): Date {
   return new Date(`${date}T00:00:00.000Z`);

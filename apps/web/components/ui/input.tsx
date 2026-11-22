@@ -5,16 +5,15 @@ export interface InputProps extends ComponentPropsWithRef<'input'> {
   invalid?: boolean;
 }
 
-// border-zinc-300 rather than border-border: a clear border on bright screens.
 export const inputClass =
-  'h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-sm font-medium ' +
-  'text-zinc-950 placeholder:text-zinc-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 ' +
-  'disabled:bg-zinc-50 disabled:text-zinc-400 transition-all';
+  'h-11 w-full rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 text-sm font-medium ' +
+  'text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 ' +
+  'disabled:bg-[var(--color-surface-muted)] disabled:text-[var(--color-text-muted)] transition-all';
 
 export function Input({ className, invalid, ...rest }: InputProps) {
   return (
     <input
-      className={cn(inputClass, invalid && 'border-red-600 focus:ring-red-600', className)}
+      className={cn(inputClass, invalid && 'border-[var(--color-danger)] focus:ring-[var(--color-danger)]/20', className)}
       aria-invalid={invalid || undefined}
       {...rest}
     />

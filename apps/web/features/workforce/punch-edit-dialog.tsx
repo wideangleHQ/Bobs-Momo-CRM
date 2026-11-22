@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { punch } from '@/features/workforce/api';
+import { punch, type ManagerPunchBody } from '@/features/workforce/api';
 
 interface Props {
   employeeId: string;
@@ -35,7 +35,7 @@ export function PunchEditDialog({ employeeId, employeeName, businessDate, onClos
   const key = useRef(crypto.randomUUID());
 
   const save = useMutation({
-    mutationFn: (body: unknown) => punch(body, key.current),
+    mutationFn: (body: ManagerPunchBody) => punch(body, key.current),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['attendance'] });
       onClose();

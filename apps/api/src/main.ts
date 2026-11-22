@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { assertSecretsDiffer, corsOrigins, env } from './config/env';
+import { assertSecretsDiffer, corsOptions, corsOrigins, env } from './config/env';
 
 async function bootstrap(): Promise<void> {
   // Load .env before schema validation. Node ≥ 20.12 built-in; no-op in
@@ -30,7 +30,14 @@ async function bootstrap(): Promise<void> {
   app.set('trust proxy', 1);
   app.setGlobalPrefix(cfg.API_PREFIX);
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors({ origin: corsOrigins(), credentials: true });
+  app.enableCors(corsOptions());
+  const origins = corsOrigins();
+  new Logger('bootstrap').log(`cors origins: ${origins.join(', ')}`);
+  if (cfg.NODE_ENV === 'production' && origins.every((o) => !o.startsWith('https://'))) {
+    new Logger('bootstrap').warn(
+      'CORS_ORIGINS has no https origin, so a deployed browser frontend will be blocked. Set it on the host.',
+    );
+  }
   app.enableShutdownHooks();
 
   await app.listen(cfg.PORT);
